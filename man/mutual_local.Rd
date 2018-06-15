@@ -2,19 +2,19 @@
 % Please edit documentation in R/mutual.R
 \name{mutual_local}
 \alias{mutual_local}
-\title{Calculates local segregation indices}
+\title{Calculates local segregation indices based on M}
 \usage{
-mutual_local(data, unit, group, weight = NULL, se = FALSE,
-  n_bootstrap = 10)
+mutual_local(data, group, unit, weight = NULL, se = FALSE,
+  n_bootstrap = 10, base = exp(1), wide = FALSE)
 }
 \arguments{
 \item{data}{A data frame.}
 
-\item{unit}{A categorical variable or a vector of variables
+\item{group}{A categorical variable or a vector of variables
 contained in \code{data}. Defines the dimension
 over which segregation is computed.}
 
-\item{group}{A categorical variable or a vector of variables
+\item{unit}{A categorical variable or a vector of variables
 contained in \code{data}. Defines the group for which local
 segregation indices are calculated.}
 
@@ -25,32 +25,39 @@ segregation indices are calculated.}
 (Default \code{FALSE})}
 
 \item{n_bootstrap}{Number of bootstrap iterations. (Default \code{10})}
+
+\item{base}{Base of the logarithm that is used in the calculation.
+Defaults to the natural logarithm.}
+
+\item{wide}{Returns a wide dataframe instead of a long dataframe.
+(Default \code{FALSE})}
 }
 \value{
-Returns a data frame with three rows for each category defined by \code{group},
-  for a total of \code{3*(number of groups)} rows. The column \code{est} defines three statistics that
-  are provided for each group: \code{ls}, the local segregation score,
-  \code{p}, the proportion of the group from the total number of cases, and
-  \code{M_group}, the product of \code{ls} and \code{p}.
+Returns a data frame with two rows for each category defined by \code{unit},
+  for a total of \code{2*(number of units)} rows. The column \code{est} contains two statistics that
+  are provided for each unit: \code{ls}, the local segregation score, and
+  \code{p}, the proportion of the unit from the total number of cases.
   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
   the associated bootstrapped standard errors, and the column \code{est} contains
   bootstrapped estimates.
+  If \code{wide} is set to \code{TRUE}, returns instead a wide dataframe, with one
+  row for each \code{unit}, and the associated statistics in separate columns.
 }
 \description{
 Returns local segregation indices for each category defined
-by \code{group}.
+by \code{unit}.
 }
 \examples{
 # which racial groups are most segregated?
-(localseg = mutual_local(schools00, "school", "race", weight="n"))
-# native americans are most segregated, whites are least segregated.
+(localseg = mutual_local(schools00, "school", "race",
+                         weight="n", wide = TRUE))
 
-sum(localseg[localseg["stat"]=="p", "est"]) # => 1
+sum(localseg$p) # => 1
 
 # the sum of the weighted local segregation scores equals
 # total segregation
-mutual_total(schools00, "school", "race", weight="n") # => .425
-sum(localseg[localseg["stat"]=="M_group", "est"]) # => .425
+sum(localseg$ls * localseg$p) # => .425
+mutual_total(schools00, "school", "race", weight="n") # M => .425
 }
 \references{
 Henri Theil. 1971. Principles of Econometrics. New York: Wiley.

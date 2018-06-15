@@ -1,44 +1,27 @@
 #' segregation: Entropy-based segregation indices
 #'
-#' Computes entropy-based segregation indices, with a focus on
-#' the mutual information index (M). The M is a measure
-#' of segregation that is highly decomposable. Provides
-#' tools to decompose the index by units and groups, and by within
+#' Calculate and decompose entropy-based, multigroup segregation indices, with a focus
+#' on the Mutual Information Index (M) and Theil's Information Index (H).
+#' Provides tools to decompose the measures by groups and units, and by within
 #' and between terms. Includes standard error estimation by bootstrapping.
 #'
-#' @section Methods:
-#'
-#' \itemize{
-#'  \item{}{\code{\link{mutual_total}} Computes M.}
-#'  \item{}{\code{\link{mutual_local}} Computes local segregation based on M.}
-#'  \item{}{\code{\link{mutual_difference}} Decomposes difference between two M indices.}
-#' }
-#' @section Data:
-#'
-#' \itemize{
-#'  \item{}{\code{\link{schools00}} and \code{\link{schools05}} Example datasets.}
-#' }
+#' @seealso \url{https://elbersb.de/segregation}
 #'
 #' @docType package
 #' @name segregation
 NULL
 
 globalVariables(c(
-    "freq",
-    "n_group", "n_unit", "n_within", "n_within_unit",
-    "p", "p_within", "p_group", "p_unit", "p_unit_g_group",
-    "entropy_cond", "M_group", "ll_part",
-    "cond1", "cond2", "entropy_cond1", "entropy_cond2",
-    "group1", "group2", "p_group1",
-    "p_group2", "p_unit_g_group1", "p_unit_g_group2",
-    "p_unit1", "p_unit2", "sumcond1", "sumcond2",
-    "miss1", "miss2",
-    "ls_group", "ls_group1", "ls_group2",
-    "same_c_diff_m", "diff_c_same_m", "est"
-))
+    "cond1", "cond2", "entropy_cond", "entropy_cond1", "entropy_cond2", "entropyw",
+    "est", "freq", "freq1", "freq2", "freq_orig1", "freq_orig2",
+    "ls_unit", "n_group", "n_group_s", "n_group_t",
+    "n_group_target", "n_source", "n_target", "n_unit", "n_unit_s", "n_unit_t",
+    "n_unit_target", "n_within_group", "p", "p_group", "p_group_g_unit", "p_group_g_unit1",
+    "p_group_g_unit2", "p_unit", "p_unit1", "p_unit2", "p_within", "ratio", "sumcond1",
+    "sumcond2", "unit1", "unit2"))
 
 as_tibble_or_df <- function(data) {
-    if (requireNamespace("tibble", quietly = TRUE)) {
+    if ("package:tibble" %in% search()) {
         tibble::as_tibble(data)
     } else {
         df <- as.data.frame(data, stringsAsFactors = FALSE)
@@ -47,23 +30,60 @@ as_tibble_or_df <- function(data) {
     }
 }
 
+logf <- function(v, base) {
+    if(missing(base)) { stop("argument base required") }
+    ifelse(v > 0 & is.finite(v), log(v, base=base), 0)
+}
 
+#' Calculates the entropy of a distribution
+#'
+#' Returns the entropy of the distribution defined by
+#' \code{group}.
+#'
+#' @param data A data frame.
+#' @param group A categorical variable or a vector of variables
+#'   contained in \code{data}.
+#' @param weight Numeric. Only frequency weights are allowed.
+#'   (Default \code{NULL})
+#' @param base Base of the logarithm that is used in the entropy
+#'   calculation. Defaults to the natural logarithm.
+#' @return A single number, the entropy.
+#' @examples
+#' d <- data.frame(cat = c("A", "B"), n = c(25, 75))
+#' entropy(d, "cat", weight = "n") # => .56
+#' # this is equivalent to -.25*log(.25)-.75*log(.75)
+#'
+#' d <- data.frame(cat = c("A", "B"), n = c(50, 50))
+#' # use base 2 for the logarithm, then entropy is maximized at 1
+#' entropy(d, "cat", weight = "n", base = 2) # => 1
 #' @import data.table
-prepare_data <- function(data, unit, group, weight, within = NULL) {
-    vars <- c(unit, group)
-
+#' @export
+entropy <- function(data, group, weight = NULL, base = exp(1)) {
     # use provided frequency weight
     if (!is.null(weight)) {
         data[, "freq"] <- data[, weight]
     } else {
         data[, "freq"] <- 1
     }
+    setDT(data)
+    n_total <- sum(data[, "freq"])
+    p <- data[, list(p = sum(freq)), by = group][["p"]] / n_total
+    sum(p * logf(1/p, base))
+}
 
-    # if within is not set, make up one that applies to the whole dataset
+
+#' @import data.table
+prepare_data <- function(data, group, unit, weight, within = NULL) {
+    vars <- c(group, unit)
+
+    # use provided frequency weight or weight of 1
+    if (!is.null(weight)) {
+        data[, "freq"] <- as.double(data[[weight]])
+    } else {
+        data[, "freq"] <- 1
+    }
+
     if (!is.null(within)) {
-        if (within == "within_dummy") {
-            data[, within] <- 1
-        }
         vars <- c(vars, within)
     }
 
@@ -72,4 +92,23 @@ prepare_data <- function(data, unit, group, weight, within = NULL) {
     data <- data[freq > 0, list(freq = sum(freq)), by = vars]
     attr(data, "vars") <- vars
     data
+}
+
+
+#' @import data.table
+add_local <- function(data, group, unit, base, weight = "freq") {
+    n_total <- sum(data[, get(weight)])
+    # generate unit and group totals
+    data[, n_unit := sum(get(weight)), by = unit]
+    data[, n_group := sum(get(weight)), by = group]
+    # generate unit and group proportions and the
+    # conditional probability of being in any group given the unit
+    data[, `:=`(
+        p_unit = n_unit / n_total,
+        p_group = n_group / n_total,
+        p_group_g_unit = get(weight) / n_unit
+    )]
+    # calculate local linkage, i.e. log(cond.) * log(cond./marginal)
+    data[, ls_unit := sum(p_group_g_unit * logf(p_group_g_unit / p_group, base)),
+           by = unit]
 }

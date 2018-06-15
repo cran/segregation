@@ -2,19 +2,19 @@
 % Please edit documentation in R/mutual.R
 \name{mutual_total}
 \alias{mutual_total}
-\title{Calculate the total mutual information index}
+\title{Calculate total segregation for M and H}
 \usage{
-mutual_total(data, unit, group, within = NULL, weight = NULL, se = FALSE,
-  n_bootstrap = 10)
+mutual_total(data, group, unit, within = NULL, weight = NULL, se = FALSE,
+  n_bootstrap = 10, base = exp(1))
 }
 \arguments{
 \item{data}{A data frame.}
 
-\item{unit}{A categorical variable or a vector of variables
+\item{group}{A categorical variable or a vector of variables
 contained in \code{data}. Defines the first dimension
 over which segregation is computed.}
 
-\item{group}{A categorical variable or a vector of variables
+\item{unit}{A categorical variable or a vector of variables
 contained in \code{data}. Defines the second dimension
 over which segregation is computed.}
 
@@ -32,41 +32,48 @@ computed within the groups defined by the variable, and then averaged.
 (Default \code{FALSE})}
 
 \item{n_bootstrap}{Number of bootstrap iterations. (Default \code{10})}
+
+\item{base}{Base of the logarithm that is used in the calculation.
+Defaults to the natural logarithm.}
 }
 \value{
-Returns a data frame with three rows. The column \code{est} contains
-  in the first row total segregation. The second and third rows contain
-  the lower and upper bounds of M, respectively.
+Returns a data frame with two rows. The column \code{est} contains
+  the Mutual Information Index, M, and Theil's Entropy Index, H. The H is the
+  the M divided by the \code{group} entropy. If \code{within} was given,
+  M and H are weighted averages of the within-category segregation scores.
   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
   the associated bootstrapped standard errors, and the column \code{est} contains
   bootstrapped estimates.
 }
 \description{
-Returns the total segregation between \code{unit} and \code{group}.
+Returns the total segregation between \code{group} and \code{unit}.
+If \code{within} is given, calculates segregation within each
+\code{within} category separately, and takes the weighted average.
+Also see \code{\link{mutual_within}} for detailed within calculations.
 }
 \examples{
 # calculate school racial segregation
-mutual_total(schools00, "school", "race", weight="n") # => .425
+mutual_total(schools00, "school", "race", weight="n") # M => .425
 
-# note that the definition of units and groups is arbitrary
-mutual_total(schools00, "race", "school", weight="n") # => .425
+# note that the definition of groups and units is arbitrary
+mutual_total(schools00, "race", "school", weight="n") # M => .425
 
-# if units or groups are defined by a combination of variables,
+# if groups or units are defined by a combination of variables,
 # vectors of variable names can be provided -
 # here there is no difference, because schools
 # are nested within districts
 mutual_total(schools00, "race", c("district", "school"),
-             weight="n") # => .424
+             weight="n") # M => .424
 
-# estimate a standard error of M
+# estimate standard errors for M and H
 mutual_total(schools00, "race", "school", weight="n", se=TRUE)
 
 # estimate segregation within school districts
 mutual_total(schools00, "race", "school",
-             within="district", weight="n") # => .087
+             within="district", weight="n") # M => .087
 
 # estimate between-district racial segregation
-mutual_total(schools00, "race", "district", weight="n") # => .338
+mutual_total(schools00, "race", "district", weight="n") # M => .338
 # note that the sum of within-district and between-district
 # segregation equals total school-race segregation;
 # here, most segregation is between school districts
@@ -74,5 +81,6 @@ mutual_total(schools00, "race", "district", weight="n") # => .338
 \references{
 Henri Theil. 1971. Principles of Econometrics. New York: Wiley.
 
-Ricardo Mora and Javier Ruiz-Castillo. 2011. "Entropy-based Segregation Indices". Sociological Methodology 41(1): 159–194.
+Ricardo Mora and Javier Ruiz-Castillo. 2011.
+     "Entropy-based Segregation Indices". Sociological Methodology 41(1): 159–194.
 }

@@ -1,136 +1,154 @@
+
 <!-- README.md is generated from README.Rmd. Please edit that file -->
-segregation
-===========
 
-An R package to calculate entropy-based segregation indices, with a
-focus on the Mutual Information Index (M).
+# segregation
 
--   calculate total, between, within, and local segregation
--   decompose differences in total segregation over time
--   estimate standard errors via bootstrapping
--   every method returns a
+[![CRAN
+Version](https://www.r-pkg.org/badges/version/segregation)](https://CRAN.R-project.org/package=segregation)
+[![Build
+Status](https://travis-ci.org/elbersb/segregation.svg?branch=master)](https://travis-ci.org/elbersb/segregation)
+[![codecov](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)](https://codecov.io/gh/elbersb/segregation)
+
+An R package to calculate and decompose entropy-based, multigroup
+segregation indices, with a focus on the Mutual Information Index (M)
+and Theil’s Information Index (H).
+
+  - calculate total, between, within, and local segregation
+  - decompose differences in total segregation over time
+  - estimate standard errors via bootstrapping
+  - every method returns a
     [tidy](http://vita.had.co.nz/papers/tidy-data.html) data frame (or
-    [tibble](http://tibble.tidyverse.org), if the package is installed)
-    for easy post-processing and plotting
--   it’s fast, because it uses the
+    [tibble](http://tibble.tidyverse.org), if the package is loaded) for
+    easy post-processing and plotting
+  - it’s fast, because it uses the
     [`data.table`](https://github.com/Rdatatable/data.table/wiki)
     package internally
 
-Example
--------
+## Usage
 
-The package provides an easy way to calculate total and local
-segregation, based on the Mutual Information Index.
+The package provides an easy way to calculate segregation measures,
+based on the Mutual Information Index (M) and Theil’s Entropy Index (H).
 
 ``` r
 library(segregation)
+
 # example dataset with fake data provided by the package
-mutual_total(schools00, "school", "race", weight = "n")
-#> # A tibble: 3 x 2
-#>   stat    est
-#> * <chr> <dbl>
-#> 1 M     0.426
-#> 2 M_min 0.   
-#> 3 M_max 1.61
+mutual_total(schools00, "race", "school", weight = "n")
+#>  stat   est
+#>     M 0.426
+#>     H 0.419
 ```
 
-Standard errors can be estimated via boostrapping:
+Standard errors in all functions can be estimated via boostrapping:
 
 ``` r
-mutual_total(schools00, "school", "race", weight = "n", se = TRUE)
+mutual_total(schools00, "race", "school", weight = "n", se = TRUE)
 #> ..........
-#> # A tibble: 3 x 3
-#>   stat    est       se
-#> * <chr> <dbl>    <dbl>
-#> 1 M     0.429 0.000935
-#> 2 M_min 0.    0.      
-#> 3 M_max 1.61  0.
+#>  stat   est       se
+#>     M 0.429 0.000935
+#>     H 0.422 0.000985
 ```
 
-Local segregation (`ls`) of racial groups, with group-specific standard
-errors:
+Decompose segregation into a between-state and a within-state term (the
+sum of these equals total segregation):
 
 ``` r
-mutual_local(schools00, "school", "race", weight = "n", se = TRUE)
+# between states
+mutual_total(schools00, "race", "state", weight = "n")
+#>  stat    est
+#>     M 0.0992
+#>     H 0.0977
+
+# within states
+mutual_total(schools00, "race", "school", within = "state", weight = "n")
+#>  stat   est
+#>     M 0.326
+#>     H 0.321
+```
+
+Local segregation (`ls`) is a decomposition by units (here racial
+groups). The sum of the proportion-weighted local segregation scores
+equals
+M:
+
+``` r
+(local <- mutual_local(schools00, group = "school", unit = "race", weight = "n", 
+             se = TRUE, wide = TRUE))
 #> ..........
-#> # A tibble: 15 x 4
-#>    race   stat        est       se
-#>    <fct>  <fct>     <dbl>    <dbl>
-#>  1 asian  ls      0.667   0.00674 
-#>  2 black  ls      0.885   0.00259 
-#>  3 hisp   ls      0.782   0.00258 
-#>  4 white  ls      0.184   0.000725
-#>  5 native ls      1.53    0.0229  
-#>  6 asian  p       0.0226  0.000124
-#>  7 black  p       0.190   0.000465
-#>  8 hisp   p       0.152   0.000317
-#>  9 white  p       0.628   0.000687
-#> 10 native p       0.00745 0.000135
-#> 11 asian  M_group 0.0151  0.000193
-#> 12 black  M_group 0.168   0.000354
-#> 13 hisp   M_group 0.119   0.000336
-#> 14 white  M_group 0.116   0.000357
-#> 15 native M_group 0.0114  0.000101
+#>    race    ls    ls_se       p     p_se
+#>   asian 0.667 0.006736 0.02261 0.000124
+#>   black 0.885 0.002595 0.19005 0.000465
+#>    hisp 0.782 0.002582 0.15179 0.000317
+#>   white 0.184 0.000725 0.62810 0.000687
+#>  native 1.528 0.022868 0.00745 0.000135
+
+sum(local$p * local$ls)
+#> [1] 0.429
 ```
 
-Decompose the difference in segregation between 2000 and 2005, using the
-method developed by Mora and Ruiz-Castillo (2009):
+Decompose the difference in M between 2000 and 2005, using iterative
+proportional fitting (IPF), as suggested by Karmel and Maclachlan
+(1988):
 
 ``` r
-mutual_difference(schools00, schools05, "school", "race", 
-                  weight = "n", method = "mrc")
-#> # A tibble: 6 x 2
-#>   stat                est
-#> * <chr>             <dbl>
-#> 1 M1              0.426  
-#> 2 M2              0.413  
-#> 3 diff           -0.0122 
-#> 4 group_marginal  0.00747
-#> 5 unit_entropy   -0.0641 
-#> 6 invariant       0.0445
+mutual_difference(schools00, schools05, group = "race", unit = "school",
+                  weight = "n", method = "ipf")
+#> ........
+#> .........
+#>            stat      est
+#>              M1  0.42554
+#>              M2  0.41339
+#>            diff -0.01215
+#>       additions -0.00341
+#>        removals -0.01141
+#>   unit_marginal -0.02020
+#>  group_marginal  0.01723
+#>     interaction  0.00245
+#>      structural  0.00318
 ```
 
-How to install
---------------
+Find more information in the
+[documentation](https://elbersb.de/segregation).
 
-The package is not on CRAN yet. If you have devtools installed, use
+## How to install
+
+To install the package from CRAN, use
+
+``` r
+install.packages("segregation") 
+```
+
+To install the development version, use
 
 ``` r
 devtools::install_github("elbersb/segregation") 
 ```
 
-to install the package.
-
-To access the documentation, type
-
-``` r
-?segregation
-```
-
-Papers using the Mutual information index
------------------------------------------
+## Papers using the Mutual information index
 
 (list incomplete)
 
--   DiPrete, T. A., Eller, C. C., Bol, T., & van de Werfhorst, H. G.
-    (2017). School-to-Work Linkages in the United States, Germany, and
-    France. American Journal of Sociology, 122(6), 1869-1938.
-    <https://doi.org/10.1086/691327>
--   Forster, A. G., & Bol, T. (2017). Vocational education and
-    employment over the life course using a new measure of occupational
-    specificity. Social Science Research, 70, 176-197.
-    <https://doi.org/10.1016/j.ssresearch.2017.11.004>
--   Van Puyenbroeck, T., De Bruyne, K., & Sels, L. (2012). More than
-    ‘Mutual Information’: Educational and sectoral gender segregation
-    and their interaction on the Flemish labor market. Labour Economics,
-    19(1), 1-8. <https://doi.org/10.1016/j.labeco.2011.05.002>
--   Mora, R., & Ruiz-Castillo, J. (2003). Additively decomposable
-    segregation indexes. The case of gender segregation by occupations
-    and human capital levels in Spain. The Journal of Economic
-    Inequality, 1(2), 147-179. <https://doi.org/10.1023/A:1026198429377>
+DiPrete, T. A., Eller, C. C., Bol, T., & van de Werfhorst, H. G. (2017).
+School-to-Work Linkages in the United States, Germany, and France.
+American Journal of Sociology, 122(6), 1869-1938.
+<https://doi.org/10.1086/691327>
 
-References on entropy-based segregation indices
------------------------------------------------
+Forster, A. G., & Bol, T. (2017). Vocational education and employment
+over the life course using a new measure of occupational specificity.
+Social Science Research, 70, 176-197.
+<https://doi.org/10.1016/j.ssresearch.2017.11.004>
+
+Van Puyenbroeck, T., De Bruyne, K., & Sels, L. (2012). More than ‘Mutual
+Information’: Educational and sectoral gender segregation and their
+interaction on the Flemish labor market. Labour Economics, 19(1), 1-8.
+<https://doi.org/10.1016/j.labeco.2011.05.002>
+
+Mora, R., & Ruiz-Castillo, J. (2003). Additively decomposable
+segregation indexes. The case of gender segregation by occupations and
+human capital levels in Spain. The Journal of Economic Inequality, 1(2),
+147-179. <https://doi.org/10.1023/A:1026198429377>
+
+## References on entropy-based segregation indices
 
 Theil, Henri. (1971). Principles of Econometrics. New York: Wiley.
 
@@ -139,9 +157,18 @@ Journal of Economic Theory, 146(1), 1-38.
 <https://doi.org/10.1016/j.jet.2010.10.008>
 
 Mora, R., & Ruiz-Castillo, J. (2009). The Invariance Properties of the
-Mutual Information Index of Multigroup Segregation. Research on Economic
-Inequality, 17, 33-53.
+Mutual Information Index of Multigroup Segregation, in: Yves Flückiger,
+Sean F. Reardon, Jacques Silber (eds.) Occupational and Residential
+Segregation (Research on Economic Inequality, Volume 17), 33-53.
 
 Mora, R., & Ruiz-Castillo, J. (2011). Entropy-based Segregation Indices.
 Sociological Methodology, 41(1), 159–194.
 <https://doi.org/10.1111/j.1467-9531.2011.01237.x>
+
+Karmel, T. & Maclachlan, M. (1988). Occupational Sex Segregation —
+Increasing or Decreasing? Economic Record 64: 187-195.
+<https://doi.org/10.1111/j.1475-4932.1988.tb02057.x>
+
+Watts, M. The Use and Abuse of Entropy Based Segregation Indices.
+Working Paper. URL:
+<http://www.ecineq.org/ecineq_lux15/FILESx2015/CR2/p217.pdf>
