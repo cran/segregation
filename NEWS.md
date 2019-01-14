@@ -1,4 +1,12 @@
-# segregation 0.0.1.9000
+# segregation 0.2.0
+
+* add "shapley" decomposition method, revisit other difference decomposition methods
+* better logging of bootstrap/IPF
+* several small fixes
+* add lintr package
+* add warning when attempting bootstrap with non-integer weights
+
+# segregation 0.1.0
 
 * switch group and unit definitions, to be consistent with the literature
 * add Theil's Information Index (H) 
