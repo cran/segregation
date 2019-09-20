@@ -23,8 +23,7 @@ for adjustment.}
 contained in \code{source} and \code{target}. Defines the second distribution
 for adjustment.}
 
-\item{weight}{Numeric. Only frequency weights are allowed.
-(Default \code{NULL})}
+\item{weight}{Numeric. (Default \code{NULL})}
 
 \item{max_iterations}{Maximum number of iterations used for the IPF algorithm.}
 
@@ -34,7 +33,7 @@ the ratio of the source and target marginals are calculated for every category o
 than \code{1 + precision}.}
 }
 \value{
-Returns a dataset that retains
+Returns a data frame that retains
   the association structure of \code{source} while approximating
   the marginal distributions for \code{group} and \code{unit} of \code{target}.
   The dataset identifies each combination of \code{group} and \code{unit},
@@ -59,6 +58,9 @@ the marginal distribution of \code{target}. If the number of \code{unit} and
 \code{group} categories is different in \code{source} and \code{target}, the data frame returns
 the combination of \code{unit} and \code{group} categories that occur in both datasets.
 Zero values are replaced by a small, non-zero number (1e-4).
+Note that the values returned sum to the observations of the source data frame, not the
+target data frame. This is different from other IPF implementations, but ensures that the IPF
+does not change the number of observations.
 }
 \examples{
 # adjusts the marginals of group and unit categories so that

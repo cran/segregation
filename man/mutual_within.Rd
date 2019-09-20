@@ -5,7 +5,7 @@
 \title{Calculate detailed within-category segregation scores for M and H}
 \usage{
 mutual_within(data, group, unit, within, weight = NULL, se = FALSE,
-  n_bootstrap = 10, base = exp(1), wide = FALSE)
+  n_bootstrap = 100, base = exp(1), wide = FALSE)
 }
 \arguments{
 \item{data}{A data frame.}
@@ -21,13 +21,12 @@ over which segregation is computed.}
 \item{within}{A categorical variable or a vector of variables
 contained in \code{data} that defines the within-segregation categories.}
 
-\item{weight}{Numeric. Only frequency weights are allowed.
-(Default \code{NULL})}
+\item{weight}{Numeric. (Default \code{NULL})}
 
 \item{se}{If \code{TRUE}, standard errors are estimated via bootstrap.
 (Default \code{FALSE})}
 
-\item{n_bootstrap}{Number of bootstrap iterations. (Default \code{10})}
+\item{n_bootstrap}{Number of bootstrap iterations. (Default \code{100})}
 
 \item{base}{Base of the logarithm that is used in the calculation.
 Defaults to the natural logarithm.}
@@ -36,7 +35,7 @@ Defaults to the natural logarithm.}
 (Default \code{FALSE})}
 }
 \value{
-Returns a data frame with four rows for each category defined by \code{within}.
+Returns a data.table with four rows for each category defined by \code{within}.
   The column \code{est} contains four statistics that
   are provided for each unit:
   \code{M} is the within-category M, and \code{p} is the proportion of the category.
@@ -59,10 +58,10 @@ within each category defined by \code{within}.
 \examples{
 (within <- mutual_within(schools00, "race", "school", within = "state",
                          weight = "n", wide = TRUE))
-# the M for "AL" is .409
+# the M for state "A" is .409
 # manual calculation
-schools_AL <- schools00[schools00$state=="AL",]
-mutual_total(schools_AL, "race", "school", weight = "n") # M => .409
+schools_A <- schools00[schools00$state=="A",]
+mutual_total(schools_A, "race", "school", weight = "n") # M => .409
 
 # to recover the within M and H from the output, multiply
 # p * M and h_weight * H, respectively

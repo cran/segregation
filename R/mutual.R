@@ -86,14 +86,13 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
 #'   If provided, segregation is
 #'   computed within the groups defined by the variable, and then averaged.
 #'   (Default \code{NULL})
-#' @param weight Numeric. Only frequency weights are allowed.
-#'   (Default \code{NULL})
+#' @param weight Numeric. (Default \code{NULL})
 #' @param se If \code{TRUE}, standard errors are estimated via bootstrap.
 #'   (Default \code{FALSE})
-#' @param n_bootstrap Number of bootstrap iterations. (Default \code{10})
+#' @param n_bootstrap Number of bootstrap iterations. (Default \code{100})
 #' @param base Base of the logarithm that is used in the calculation.
 #'   Defaults to the natural logarithm.
-#' @return Returns a data frame with two rows. The column \code{est} contains
+#' @return Returns a data.table with two rows. The column \code{est} contains
 #'   the Mutual Information Index, M, and Theil's Entropy Index, H. The H is the
 #'   the M divided by the \code{group} entropy. If \code{within} was given,
 #'   M and H are weighted averages of the within-category segregation scores.
@@ -107,34 +106,34 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
 #'      "Entropy-based Segregation Indices". Sociological Methodology 41(1): 159–194.
 #' @examples
 #' # calculate school racial segregation
-#' mutual_total(schools00, "school", "race", weight="n") # M => .425
+#' mutual_total(schools00, "school", "race", weight = "n") # M => .425
 #'
 #' # note that the definition of groups and units is arbitrary
-#' mutual_total(schools00, "race", "school", weight="n") # M => .425
+#' mutual_total(schools00, "race", "school", weight = "n") # M => .425
 #'
 #' # if groups or units are defined by a combination of variables,
 #' # vectors of variable names can be provided -
 #' # here there is no difference, because schools
 #' # are nested within districts
 #' mutual_total(schools00, "race", c("district", "school"),
-#'              weight="n") # M => .424
+#'              weight = "n") # M => .424
 #'
 #' # estimate standard errors for M and H
-#' mutual_total(schools00, "race", "school", weight="n", se=TRUE)
+#' mutual_total(schools00, "race", "school", weight = "n", se = TRUE, n_bootstrap = 10)
 #'
 #' # estimate segregation within school districts
 #' mutual_total(schools00, "race", "school",
-#'              within="district", weight="n") # M => .087
+#'              within = "district", weight = "n") # M => .087
 #'
 #' # estimate between-district racial segregation
-#' mutual_total(schools00, "race", "district", weight="n") # M => .338
+#' mutual_total(schools00, "race", "district", weight = "n") # M => .338
 #' # note that the sum of within-district and between-district
 #' # segregation equals total school-race segregation;
 #' # here, most segregation is between school districts
 #' @import data.table
 #' @export
 mutual_total <- function(data, group, unit, within = NULL,
-                         weight = NULL, se = FALSE, n_bootstrap = 10, base = exp(1)) {
+                         weight = NULL, se = FALSE, n_bootstrap = 100, base = exp(1)) {
     d <- prepare_data(data, group, unit, weight, within)
 
     if (se == FALSE) {
@@ -147,8 +146,12 @@ mutual_total <- function(data, group, unit, within = NULL,
         vars <- attr(d, "vars")
         n_total <- sum(d[, "freq"])
 
-        if (!all(d[["freq"]] == round(d[["freq"]]))) {
-            warning("bootstrap with non-integer weights")
+        if (all.equal(n_total, round(n_total)) == TRUE) {
+            message(paste0(n_bootstrap, " bootstrap iterations on ", n_total, " observations"))
+        } else {
+            stop(paste0(
+                "bootstrap with a total sample size that is not an integer is not allowed, ",
+                "maybe scale your weights?"))
         }
 
         boot_ret <- lapply(1:n_bootstrap, function(i) {
@@ -169,8 +172,7 @@ mutual_total <- function(data, group, unit, within = NULL,
         ret <- boot_ret[, list(
             est = mean(est), se = stats::sd(est)), by = c("stat")]
     }
-    rownames(ret) <- ret[["stat"]]
-    as_df(ret)
+    ret
 }
 
 #' Calculate detailed within-category segregation scores for M and H
@@ -187,16 +189,15 @@ mutual_total <- function(data, group, unit, within = NULL,
 #'   over which segregation is computed.
 #' @param within A categorical variable or a vector of variables
 #'   contained in \code{data} that defines the within-segregation categories.
-#' @param weight Numeric. Only frequency weights are allowed.
-#'   (Default \code{NULL})
+#' @param weight Numeric. (Default \code{NULL})
 #' @param se If \code{TRUE}, standard errors are estimated via bootstrap.
 #'   (Default \code{FALSE})
-#' @param n_bootstrap Number of bootstrap iterations. (Default \code{10})
+#' @param n_bootstrap Number of bootstrap iterations. (Default \code{100})
 #' @param base Base of the logarithm that is used in the calculation.
 #'   Defaults to the natural logarithm.
 #' @param wide Returns a wide dataframe instead of a long dataframe.
 #'   (Default \code{FALSE})
-#' @return Returns a data frame with four rows for each category defined by \code{within}.
+#' @return Returns a data.table with four rows for each category defined by \code{within}.
 #'   The column \code{est} contains four statistics that
 #'   are provided for each unit:
 #'   \code{M} is the within-category M, and \code{p} is the proportion of the category.
@@ -219,10 +220,10 @@ mutual_total <- function(data, group, unit, within = NULL,
 #' @examples
 #' (within <- mutual_within(schools00, "race", "school", within = "state",
 #'                          weight = "n", wide = TRUE))
-#' # the M for "AL" is .409
+#' # the M for state "A" is .409
 #' # manual calculation
-#' schools_AL <- schools00[schools00$state=="AL",]
-#' mutual_total(schools_AL, "race", "school", weight = "n") # M => .409
+#' schools_A <- schools00[schools00$state=="A",]
+#' mutual_total(schools_A, "race", "school", weight = "n") # M => .409
 #'
 #' # to recover the within M and H from the output, multiply
 #' # p * M and h_weight * H, respectively
@@ -233,7 +234,7 @@ mutual_total <- function(data, group, unit, within = NULL,
 #' @import data.table
 #' @export
 mutual_within <- function(data, group, unit, within,
-                         weight = NULL, se = FALSE, n_bootstrap = 10, base = exp(1),
+                         weight = NULL, se = FALSE, n_bootstrap = 100, base = exp(1),
                          wide = FALSE) {
     d <- prepare_data(data, group, unit, weight, within)
 
@@ -243,8 +244,12 @@ mutual_within <- function(data, group, unit, within,
         vars <- attr(d, "vars")
         n_total <- sum(d[, "freq"])
 
-        if (!all(d[["freq"]] == round(d[["freq"]]))) {
-            warning("bootstrap with non-integer weights")
+        if (all.equal(n_total, round(n_total)) == TRUE) {
+            message(paste0(n_bootstrap, " bootstrap iterations on ", n_total, " observations"))
+        } else {
+            stop(paste0(
+                "bootstrap with a total sample size that is not an integer is not allowed, ",
+                "maybe scale your weights?"))
         }
 
         boot_ret <- lapply(1:n_bootstrap, function(i) {
@@ -278,8 +283,7 @@ mutual_within <- function(data, group, unit, within,
             ret <- dcast(ret, f, value.var = c("est"))
         }
     }
-
-    as_df(ret)
+    ret
 }
 
 #' @import data.table
@@ -306,16 +310,15 @@ mutual_local_compute <- function(data, group, unit, base = exp(1)) {
 #' @param unit A categorical variable or a vector of variables
 #'   contained in \code{data}. Defines the group for which local
 #'   segregation indices are calculated.
-#' @param weight Numeric. Only frequency weights are allowed.
-#'   (Default \code{NULL})
+#' @param weight Numeric. (Default \code{NULL})
 #' @param se If \code{TRUE}, standard errors are estimated via bootstrap.
 #'   (Default \code{FALSE})
-#' @param n_bootstrap Number of bootstrap iterations. (Default \code{10})
+#' @param n_bootstrap Number of bootstrap iterations. (Default \code{100})
 #' @param base Base of the logarithm that is used in the calculation.
 #'   Defaults to the natural logarithm.
 #' @param wide Returns a wide dataframe instead of a long dataframe.
 #'   (Default \code{FALSE})
-#' @return Returns a data frame with two rows for each category defined by \code{unit},
+#' @return Returns a data.table with two rows for each category defined by \code{unit},
 #'   for a total of \code{2*(number of units)} rows.
 #'   The column \code{est} contains two statistics that
 #'   are provided for each unit: \code{ls}, the local segregation score, and
@@ -331,20 +334,20 @@ mutual_local_compute <- function(data, group, unit, base = exp(1)) {
 #' Ricardo Mora and Javier Ruiz-Castillo. 2011.
 #'   "Entropy-based Segregation Indices". Sociological Methodology 41(1): 159–194.
 #' @examples
-#' # which racial groups are most segregated?
-#' (localseg = mutual_local(schools00, "school", "race",
-#'                          weight="n", wide = TRUE))
+#' # which schools are most segregated?
+#' (localseg = mutual_local(schools00, "race", "school",
+#'                          weight = "n", wide = TRUE))
 #'
 #' sum(localseg$p) # => 1
 #'
 #' # the sum of the weighted local segregation scores equals
 #' # total segregation
 #' sum(localseg$ls * localseg$p) # => .425
-#' mutual_total(schools00, "school", "race", weight="n") # M => .425
+#' mutual_total(schools00, "school", "race", weight = "n") # M => .425
 #' @import data.table
 #' @export
 mutual_local <- function(data, group, unit, weight = NULL,
-                         se = FALSE, n_bootstrap = 10, base = exp(1),
+                         se = FALSE, n_bootstrap = 100, base = exp(1),
                          wide = FALSE) {
     d <- prepare_data(data, group, unit, weight)
 
@@ -354,8 +357,12 @@ mutual_local <- function(data, group, unit, weight = NULL,
         vars <- attr(d, "vars")
         n_total <- sum(d[, "freq"])
 
-        if (!all(d[["freq"]] == round(d[["freq"]]))) {
-            warning("bootstrap with non-integer weights")
+        if (all.equal(n_total, round(n_total)) == TRUE) {
+            message(paste0(n_bootstrap, " bootstrap iterations on ", n_total, " observations"))
+        } else {
+            stop(paste0(
+                "bootstrap with a total sample size that is not an integer is not allowed, ",
+                "maybe scale your weights?"))
         }
 
         boot_ret <- lapply(1:n_bootstrap, function(i) {
@@ -385,6 +392,5 @@ mutual_local <- function(data, group, unit, weight = NULL,
             ret <- dcast(ret, f, value.var = c("est"))
         }
     }
-
-    as_df(ret)
+    ret
 }

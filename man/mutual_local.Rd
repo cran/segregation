@@ -5,7 +5,7 @@
 \title{Calculates local segregation indices based on M}
 \usage{
 mutual_local(data, group, unit, weight = NULL, se = FALSE,
-  n_bootstrap = 10, base = exp(1), wide = FALSE)
+  n_bootstrap = 100, base = exp(1), wide = FALSE)
 }
 \arguments{
 \item{data}{A data frame.}
@@ -18,13 +18,12 @@ over which segregation is computed.}
 contained in \code{data}. Defines the group for which local
 segregation indices are calculated.}
 
-\item{weight}{Numeric. Only frequency weights are allowed.
-(Default \code{NULL})}
+\item{weight}{Numeric. (Default \code{NULL})}
 
 \item{se}{If \code{TRUE}, standard errors are estimated via bootstrap.
 (Default \code{FALSE})}
 
-\item{n_bootstrap}{Number of bootstrap iterations. (Default \code{10})}
+\item{n_bootstrap}{Number of bootstrap iterations. (Default \code{100})}
 
 \item{base}{Base of the logarithm that is used in the calculation.
 Defaults to the natural logarithm.}
@@ -33,7 +32,7 @@ Defaults to the natural logarithm.}
 (Default \code{FALSE})}
 }
 \value{
-Returns a data frame with two rows for each category defined by \code{unit},
+Returns a data.table with two rows for each category defined by \code{unit},
   for a total of \code{2*(number of units)} rows.
   The column \code{est} contains two statistics that
   are provided for each unit: \code{ls}, the local segregation score, and
@@ -49,16 +48,16 @@ Returns local segregation indices for each category defined
 by \code{unit}.
 }
 \examples{
-# which racial groups are most segregated?
-(localseg = mutual_local(schools00, "school", "race",
-                         weight="n", wide = TRUE))
+# which schools are most segregated?
+(localseg = mutual_local(schools00, "race", "school",
+                         weight = "n", wide = TRUE))
 
 sum(localseg$p) # => 1
 
 # the sum of the weighted local segregation scores equals
 # total segregation
 sum(localseg$ls * localseg$p) # => .425
-mutual_total(schools00, "school", "race", weight="n") # M => .425
+mutual_total(schools00, "school", "race", weight = "n") # M => .425
 }
 \references{
 Henri Theil. 1971. Principles of Econometrics. New York: Wiley.

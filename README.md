@@ -7,7 +7,8 @@
 Version](https://www.r-pkg.org/badges/version/segregation)](https://CRAN.R-project.org/package=segregation)
 [![Build
 Status](https://travis-ci.org/elbersb/segregation.svg?branch=master)](https://travis-ci.org/elbersb/segregation)
-[![codecov](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)](https://codecov.io/gh/elbersb/segregation)
+[![Coverage
+status](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)](https://codecov.io/github/elbersb/segregation?branch=master)
 
 An R package to calculate and decompose entropy-based, multigroup
 segregation indices, with a focus on the Mutual Information Index (M)
@@ -17,8 +18,9 @@ and Theil’s Information Index (H).
   - decompose differences in total segregation over time
   - estimate standard errors via bootstrapping
   - every method returns a
-    [tidy](http://vita.had.co.nz/papers/tidy-data.html) data frame for
-    easy post-processing and plotting
+    [tidy](http://vita.had.co.nz/papers/tidy-data.html)
+    [data.table](http://r-datatable.com) for easy post-processing and
+    plotting
   - it’s fast, because it uses the
     [`data.table`](https://github.com/Rdatatable/data.table/wiki)
     package internally
@@ -42,9 +44,10 @@ Standard errors in all functions can be estimated via boostrapping:
 
 ``` r
 mutual_total(schools00, "race", "school", weight = "n", se = TRUE)
+#> 100 bootstrap iterations on 877739 observations
 #>  stat   est       se
-#>     M 0.429 0.000935
-#>     H 0.422 0.000985
+#>     M 0.429 0.000724
+#>     H 0.422 0.000637
 ```
 
 Decompose segregation into a between-state and a within-state term (the
@@ -66,18 +69,18 @@ mutual_total(schools00, "race", "school", within = "state", weight = "n")
 
 Local segregation (`ls`) is a decomposition by units (here racial
 groups). The sum of the proportion-weighted local segregation scores
-equals
-M:
+equals M:
 
 ``` r
 (local <- mutual_local(schools00, group = "school", unit = "race", weight = "n",
              se = TRUE, wide = TRUE))
-#>    race    ls    ls_se       p     p_se
-#>   asian 0.667 0.006736 0.02261 0.000124
-#>   black 0.885 0.002595 0.19005 0.000465
-#>    hisp 0.782 0.002582 0.15179 0.000317
-#>   white 0.184 0.000725 0.62810 0.000687
-#>  native 1.528 0.022868 0.00745 0.000135
+#> 100 bootstrap iterations on 877739 observations
+#>    race    ls   ls_se       p     p_se
+#>   asian 0.667 0.00598 0.02257 0.000163
+#>   black 0.885 0.00222 0.19017 0.000408
+#>    hisp 0.782 0.00234 0.15167 0.000399
+#>   white 0.184 0.00056 0.62807 0.000511
+#>  native 1.519 0.01649 0.00751 0.000101
 
 sum(local$p * local$ls)
 #> [1] 0.429
@@ -96,9 +99,9 @@ mutual_difference(schools00, schools05, group = "race", unit = "school",
 #>            diff -0.01215
 #>       additions -0.00341
 #>        removals -0.01141
-#>  group_marginal  0.01623
-#>   unit_marginal -0.01674
-#>      structural  0.00318
+#>  group_marginal  0.01855
+#>   unit_marginal -0.01239
+#>      structural -0.00349
 ```
 
 Find more information in the

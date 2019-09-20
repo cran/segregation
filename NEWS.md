@@ -1,3 +1,13 @@
+# segregation 0.3.0
+
+* always return data.table
+* for ipf function, warn when groups/units are dropped
+* return sample size of source dataset for IPF
+* don't allow bootstrap when sample size is not an integer, but allow non-integer sample weights (which are unproblematic)
+* simplify precision parameter for ipf procedure
+* increase default bootstrap to 100
+* fix data.table issue (#3)
+
 # segregation 0.2.0
 
 * add "shapley" decomposition method, revisit other difference decomposition methods
@@ -9,7 +19,7 @@
 # segregation 0.1.0
 
 * switch group and unit definitions, to be consistent with the literature
-* add Theil's Information Index (H) 
+* add Theil's Information Index (H)
 * add entropy function
 * add mutual_within function to decompose weighted within indices
 * add "wide" option to mutual_local and mutual_within

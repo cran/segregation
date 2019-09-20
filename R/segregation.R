@@ -5,20 +5,19 @@
 #' Provides tools to decompose the measures by groups and units, and by within
 #' and between terms. Includes standard error estimation by bootstrapping.
 #'
-#' @seealso \url{https://elbersb.de/segregation}
+#' @seealso \url{https://elbersb.com/segregation}
 #'
 #' @docType package
 #' @name segregation
 NULL
 
 globalVariables(c(
-    "cond1", "cond2", "entropy_cond", "entropy_cond1", "entropy_cond2", "entropyw",
-    "est", "freq", "freq1", "freq2", "freq_orig1", "freq_orig2",
-    "ls_unit", "n_group", "n_group_s", "n_group_t",
-    "n_group_target", "n_source", "n_target", "n_unit", "n_unit_s", "n_unit_t",
-    "n_unit_target", "n_within_group", "p", "p_group", "p_group_g_unit", "p_group_g_unit1",
-    "p_group_g_unit2", "p_unit", "p_unit1", "p_unit2", "p_within", "ratio", "sumcond1",
-    "sumcond2", "unit1", "unit2"))
+    "V1", "V2", "cond1", "cond2", "entropy_cond", "entropy_cond1", "entropy_cond2", "entropyw",
+    "est", "freq", "freq1", "freq2", "freq_orig1", "freq_orig2", "ls_diff1", "ls_diff2", "ls_unit",
+    "n", "n_group", "n_group_target", "n_source", "n_target", "n_unit", "n_unit_target",
+    "n_within_group", "p", "p1", "p2", "p_group", "p_group_g_unit", "p_group_g_unit1",
+    "p_group_g_unit2", "p_group_s", "p_group_t", "p_unit", "p_unit1", "p_unit2", "p_unit_s",
+    "p_unit_t", "p_within", "sumcond1", "sumcond2", "total", "unit1", "unit2"))
 
 # log
 
@@ -76,12 +75,6 @@ close_log()
 
 # helpers
 
-as_df <- function(data) {
-    df <- as.data.frame(data, stringsAsFactors = FALSE)
-    rownames(df) <- rownames(data)
-    df
-}
-
 logf <- function(v, base) {
     if (missing(base)) {
         stop("argument base required")
@@ -97,8 +90,7 @@ logf <- function(v, base) {
 #' @param data A data frame.
 #' @param group A categorical variable or a vector of variables
 #'   contained in \code{data}.
-#' @param weight Numeric. Only frequency weights are allowed.
-#'   (Default \code{NULL})
+#' @param weight Numeric. (Default \code{NULL})
 #' @param base Base of the logarithm that is used in the entropy
 #'   calculation. Defaults to the natural logarithm.
 #' @return A single number, the entropy.
@@ -113,7 +105,7 @@ logf <- function(v, base) {
 #' @import data.table
 #' @export
 entropy <- function(data, group, weight = NULL, base = exp(1)) {
-    # use provided frequency weight
+    # use provided weight
     if (!is.null(weight)) {
         data[, "freq"] <- data[, weight]
     } else {
@@ -128,9 +120,22 @@ entropy <- function(data, group, weight = NULL, base = exp(1)) {
 
 #' @import data.table
 prepare_data <- function(data, group, unit, weight, within = NULL) {
+    if ("data.frame" %in% class(data)) {
+        if (nrow(data) == 0) {
+            stop("data.frame is empty")
+        }
+        test_vars <- c(group, unit, weight, within)
+        test_vars <- test_vars[!test_vars %in% names(data)]
+        if (length(test_vars) > 0) {
+            test_vars <- paste0(test_vars, collapse = ", ")
+            stop(paste0("variable(s) ", test_vars, " not in data.frame"))
+        }
+    } else {
+        stop("not a data.frame")
+    }
     vars <- c(group, unit)
 
-    # use provided frequency weight or weight of 1
+    # use provided weight or weight of 1
     if (!is.null(weight)) {
         data[, "freq"] <- as.double(data[[weight]])
     } else {
@@ -144,7 +149,7 @@ prepare_data <- function(data, group, unit, weight, within = NULL) {
     # collapse on vars, and select only positive weights
     data.table::setDT(data)
     data <- data[freq > 0, list(freq = sum(freq)), by = vars]
-    attr(data, "vars") <- vars
+    setattr(data, "vars", vars)
     setkey(data, NULL)
     data
 }

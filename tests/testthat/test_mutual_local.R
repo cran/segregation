@@ -1,4 +1,4 @@
-library(segregation)
+library("segregation")
 context("test_mutual_local")
 
 test_data <- data.frame(
@@ -13,21 +13,21 @@ localse <- mutual_local(test_data, "u", "g", weight = "n", se = TRUE, n_bootstra
 localbase2 <- mutual_local(test_data, "g", "u", weight = "n", base = 2)
 
 test_that("local calculation works", {
-    expect_equal(sum(local[local$stat == "p", "est"]), 1)
-    expect_equal(sum(local2[local2$stat == "p", "est"]), 1)
-    expect_equal(sum(localse[localse$stat == "p", "est"]), 1)
+    expect_equal(sum(local[stat == "p", est]), 1)
+    expect_equal(sum(local2[local2$stat == "p", est]), 1)
+    expect_equal(sum(localse[localse$stat == "p", est]), 1)
 
     expect_equal(
-        sum(local[local$stat == "p", "est"] * local[local$stat == "ls", "est"]),
-        sum(local2[local2$stat == "p", "est"] * local2[local2$stat == "ls", "est"])
+        sum(local[stat == "p", est] * local[stat == "ls", est]),
+        sum(local2[local2$stat == "p", est] * local2[local2$stat == "ls", est])
     )
     expect_equal(
-        sum(local[local$stat == "p", "est"] * local[local$stat == "ls", "est"]),
-        mutual_total(test_data, "u", "g", weight = "n")[["M", "est"]]
+        sum(local[stat == "p", est] * local[stat == "ls", est]),
+        mutual_total(test_data, "u", "g", weight = "n")[stat == "M", est]
     )
     expect_equal(
-        sum(localbase2[localbase2$stat == "p", "est"] * localbase2[localbase2$stat == "ls", "est"]),
-        mutual_total(test_data, "u", "g", weight = "n", base = 2)[["M", "est"]]
+        sum(localbase2[stat == "p", est] * localbase2[stat == "ls", est]),
+        mutual_total(test_data, "u", "g", weight = "n", base = 2)[stat == "M", est]
     )
 })
 
@@ -39,6 +39,20 @@ test_that("return works", {
 test_that("bootstrapping works", {
     expect_equal(nrow(localse), 8)
     expect_equal(ncol(localse), 4)
+})
+
+test_that("bootstrapping fails when sample size is non-integer", {
+    test_data <- data.frame(
+        u = c(rep("a", 4), rep("b", 4)),
+        g = rep(c(1, 2, 3, 4), 2),
+        n = c(40, 20, 5, 1, 20, 40, 60, 80.3)
+    )
+
+    expect_error(mutual_local(test_data, "u", "g", weight = "n", se = TRUE))
+    # rescale
+    test_data$n2 <- test_data$n / sum(test_data$n) * round(sum(test_data$n))
+    ret <- mutual_local(test_data, "u", "g", weight = "n2", se = TRUE)
+    expect_equal(all(ret$se > 0), TRUE)
 })
 
 test_that("option wide works", {
@@ -54,14 +68,14 @@ test_that("option wide works", {
     expect_equal(ncol(wide) + 2, ncol(wide_se))
     expect_equal(nrow(wide), nrow(wide_se))
 
-    expect_equal(nowide[nowide$stat == "ls", ][["est"]], wide$ls)
-    expect_equal(nowide[nowide$stat == "p", ][["est"]], wide$p)
+    expect_equal(nowide[stat == "ls", est], wide$ls)
+    expect_equal(nowide[stat == "p", est], wide$p)
 
     total <- mutual_total(test_data, "u", "g", weight = "n")
-    expect_equal(total[["M", "est"]],
-                 sum(nowide[nowide$stat == "ls", "est"] * nowide[nowide$stat == "p", "est"]))
-    expect_equal(total[["M", "est"]], sum(wide$ls * wide$p))
-    expect_equal(total[["H", "est"]], sum(wide$ls * wide$p) / entropy(test_data, "u", "n"))
+    expect_equal(total[stat == "M", est],
+                 sum(nowide[stat == "ls", est] * nowide[stat == "p", "est"]))
+    expect_equal(total[stat == "M", est], sum(wide$ls * wide$p))
+    expect_equal(total[stat == "H", est], sum(wide$ls * wide$p) / entropy(test_data, "u", "n"))
 
-    expect_equal(all(nowide_se["se"] > 0), TRUE)
+    expect_equal(all(nowide_se[["se"]] > 0), TRUE)
 })
