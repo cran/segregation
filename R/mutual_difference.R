@@ -47,7 +47,9 @@
 #' @param weight Numeric. (Default \code{NULL})
 #' @param method Either "shapley" (the default), "km" (Karmel and Maclachlan method), or
 #'   "mrc" (Mora and Ruiz-Castillo method).
-#' @param se If \code{TRUE}, standard errors are estimated via bootstrap.
+#' @param se If \code{TRUE}, the segregation estimates are bootstrapped to provide
+#'   standard errors and to apply bias correction. The bias that is reported
+#'   has already been applied to the estimates (i.e. the reported estimates are "debiased")
 #'   (Default \code{FALSE})
 #' @param n_bootstrap Number of bootstrap iterations. (Default \code{100})
 #' @param ... Only used for additional arguments when
@@ -75,19 +77,20 @@
 #'      of \code{unit} and \code{group}.
 #'
 #'   When "shapley_detailed" is used, an additional column "unit" is returned, along with
-#'     five additional rows for each unit that is present in both \code{data1} and \code{data2}.
+#'     six additional rows for each unit that is present in both \code{data1} and \code{data2}.
 #'     The five rows have the following meaning:
 #'     \code{p1} (\code{p2}) is the proportion of the unit in \code{data1} (\code{data2})
 #'     once non-intersecting units/groups have been removed. The changes in local linkage are
-#'     given by \code{ls_diff1} and \code{ls_diff2}. The row named \code{total}
+#'     given by \code{ls_diff1} and \code{ls_diff2}, and their average is given by
+#'     \code{ls_diff_mean}. The row named \code{total}
 #'     summarizes the contribution of
 #'     the unit towards structural change
 #'     using the formula \code{.5 * p1 * ls_diff1 + .5 * p2 * ls_diff2}.
 #'     The sum of all "total" components equals structural change.
 #'
 #'   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
-#'   the associated bootstrapped standard errors, and the column \code{est} contains
-#'   bootstrapped estimates.
+#'   the associated bootstrapped standard errors, an additional column \code{bias} contains
+#'   the estimated bias, and the column \code{est} contains the bias-corrected estimates.
 #' @references
 #' W. E. Deming, F. F. Stephan. 1940. "On a Least Squares Adjustment of a Sampled Frequency Table
 #'    When the Expected Marginal Totals are Known."
@@ -157,9 +160,9 @@ mutual_difference <- function(data1, data2, group, unit,
         unique(d2[, unit, with = FALSE])))
     if (nrow_unit == 0) stop("No overlap in unit")
 
-    if (se == FALSE) {
-        ret <- fun(d1, d2, group, unit, base, ...)
-    } else {
+    ret <- fun(d1, d2, group, unit, base, ...)
+
+    if (se == TRUE) {
         vars <- attr(d1, "vars")
         n_total1 <- sum(d1[, "freq"])
         n_total2 <- sum(d2[, "freq"])
@@ -171,25 +174,29 @@ mutual_difference <- function(data1, data2, group, unit,
                 "maybe scale your weights?"))
         }
 
-        boot_ret <- lapply(1:n_bootstrap, function(i) {
+        # draw from a multinomial with weights specified by the cell counts
+        draws1 <- stats::rmultinom(n_bootstrap, n_total1, d1[["freq"]] / n_total1)
+        draws2 <- stats::rmultinom(n_bootstrap, n_total2, d2[["freq"]] / n_total2)
+
+        boot_ret <- lapply(seq_len(n_bootstrap), function(i) {
             update_log(bs_n = i, bs_max = n_bootstrap)
-            # resample and collapse by all variables, except "freq"
-            # coerce to double here, otherwise data.table complains later
-            resampled1 <- d1[
-                sample(.N, n_total1, replace = TRUE, prob = freq)][,
-                list(freq = as.double(.N)), by = vars]
-            resampled2 <- d2[
-                sample(.N, n_total2, replace = TRUE, prob = freq)][,
-                list(freq = as.double(.N)), by = vars]
-            fun(resampled1, resampled2, group, unit, base, ...)
+            d1[, freq := as.double(draws1[, i])]
+            d2[, freq := as.double(draws2[, i])]
+            fun(d1[freq > 0], d2[freq > 0], group, unit, base, ...)
         })
+
         boot_ret <- rbindlist(boot_ret)
-        # summarize bootstrapped data frames
-        ret <- boot_ret[, list(
-            est = mean(est), se = stats::sd(est)), by = cols]
+        ret_boot <- boot_ret[, list(
+            mean_boot = mean(est), se = stats::sd(est)), by = cols]
+        ret <- merge(ret, ret_boot, by = cols, sort = FALSE)
+        # debias
+        ret[, bias := mean_boot - est]
+        ret[, est := est - bias]
+        ret[, mean_boot := NULL]
+        setattr(ret, "bootstrap", boot_ret)
     }
     close_log()
-    ret
+    data.table(ret)
 }
 
 
@@ -263,6 +270,7 @@ shapley_compute <- function(d1, d2, group, unit, base, detail, ...) {
         ls <- Reduce(merge, list(ls_AAB, ls_AAA, ls_BBB, ls_BBA))
         ls[, `:=`(ls_diff1 = ls_AAB - ls_AAA, ls_diff2 = ls_BBB - ls_BBA)]
         ls[, c("ls_AAB", "ls_AAA", "ls_BBB", "ls_BBA") := NULL]
+        ls[, ls_diff_mean := .5 * ls_diff1 + .5 * ls_diff2]
         ls[, total := .5 * p1 * ls_diff1 + .5 * p2 * ls_diff2]
         ls <- melt(ls, unit, variable.name = "stat", value.name = "est")
         setorderv(ls, unit)

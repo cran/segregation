@@ -5,8 +5,8 @@
 
 [![CRAN
 Version](https://www.r-pkg.org/badges/version/segregation)](https://CRAN.R-project.org/package=segregation)
-[![Build
-Status](https://travis-ci.org/elbersb/segregation.svg?branch=master)](https://travis-ci.org/elbersb/segregation)
+[![R build
+status](https://github.com/elbersb/segregation/workflows/R-CMD-check/badge.svg)](https://github.com/elbersb/segregation/actions)
 [![Coverage
 status](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)](https://codecov.io/github/elbersb/segregation?branch=master)
 
@@ -14,16 +14,23 @@ An R package to calculate and decompose entropy-based, multigroup
 segregation indices, with a focus on the Mutual Information Index (M)
 and Theil’s Information Index (H).
 
-  - calculate total, between, within, and local segregation
-  - decompose differences in total segregation over time
-  - estimate standard errors via bootstrapping
-  - every method returns a
-    [tidy](http://vita.had.co.nz/papers/tidy-data.html)
-    [data.table](http://r-datatable.com) for easy post-processing and
-    plotting
-  - it’s fast, because it uses the
-    [`data.table`](https://github.com/Rdatatable/data.table/wiki)
-    package internally
+Find more information in the
+[documentation](https://elbersb.de/segregation).
+
+-   calculate total, between, within, and local segregation
+-   decompose differences in total segregation over time
+-   estimate standard errors via bootstrapping
+-   every method returns a
+    [tidy](https://vita.had.co.nz/papers/tidy-data.html)
+    [data.table](https://rdatatable.gitlab.io/data.table/) for easy
+    post-processing and plotting
+-   it’s fast, because it uses the
+    [`data.table`](https://rdatatable.gitlab.io/data.table/) package
+    internally
+
+Most of the procedures implemented in this package are described in more
+detail [in this working
+paper](https://osf.io/preprints/socarxiv/ya7zs/).
 
 ## Usage
 
@@ -40,14 +47,15 @@ mutual_total(schools00, "race", "school", weight = "n")
 #>     H 0.419
 ```
 
-Standard errors in all functions can be estimated via boostrapping:
+Standard errors in all functions can be estimated via boostrapping. This
+will also apply bias-correction to the estimates:
 
 ``` r
 mutual_total(schools00, "race", "school", weight = "n", se = TRUE)
 #> 100 bootstrap iterations on 877739 observations
-#>  stat   est       se
-#>     M 0.429 0.000724
-#>     H 0.422 0.000637
+#>  stat   est       se    bias
+#>     M 0.422 0.000796 0.00352
+#>     H 0.415 0.000689 0.00356
 ```
 
 Decompose segregation into a between-state and a within-state term (the
@@ -75,15 +83,15 @@ equals M:
 (local <- mutual_local(schools00, group = "school", unit = "race", weight = "n",
              se = TRUE, wide = TRUE))
 #> 100 bootstrap iterations on 877739 observations
-#>    race    ls   ls_se       p     p_se
-#>   asian 0.667 0.00598 0.02257 0.000163
-#>   black 0.885 0.00222 0.19017 0.000408
-#>    hisp 0.782 0.00234 0.15167 0.000399
-#>   white 0.184 0.00056 0.62807 0.000511
-#>  native 1.519 0.01649 0.00751 0.000101
+#>    race    ls    ls_se  ls_bias       p      p_se      p_bias
+#>   asian 0.591 0.005636 0.037269 0.02253 0.0001459  0.00002652
+#>   black 0.876 0.002080 0.004634 0.19019 0.0003918 -0.00004009
+#>    hisp 0.771 0.002116 0.005306 0.15165 0.0004028  0.00004914
+#>   white 0.183 0.000518 0.000607 0.62812 0.0005175 -0.00003223
+#>  native 1.350 0.016045 0.084480 0.00751 0.0000854 -0.00000334
 
 sum(local$p * local$ls)
-#> [1] 0.429
+#> [1] 0.422
 ```
 
 Decompose the difference in M between 2000 and 2005, using iterative
@@ -99,8 +107,8 @@ mutual_difference(schools00, schools05, group = "race", unit = "school",
 #>            diff -0.01215
 #>       additions -0.00341
 #>        removals -0.01141
-#>  group_marginal  0.01855
-#>   unit_marginal -0.01239
+#>  group_marginal  0.01787
+#>   unit_marginal -0.01171
 #>      structural -0.00349
 ```
 
@@ -152,6 +160,10 @@ Occupational Segregation: The Case of Switzerland (1970–2000), in: Yves
 Flückiger, Sean F. Reardon, Jacques Silber (eds.) Occupational and
 Residential Segregation (Research on Economic Inequality, Volume 17),
 171–202.
+
+Elbers, B. (2019). A Method for Studying Difference in Segregation
+Levels Across Time and Space. SocArXiv Working Paper.
+<https://osf.io/preprints/socarxiv/ya7zs/>
 
 Theil, H. (1971). Principles of Econometrics. New York: Wiley.
 

@@ -161,23 +161,23 @@ test_that("mutual_difference SE", {
     ret <- mutual_difference(test_data1, test_data2, "g", "u", weight = "n",
                              method = "shapley", se = TRUE, n_bootstrap = 5)
     expect_equal(nrow(ret), 8)
-    expect_equal(ncol(ret), 3)
+    expect_equal(ncol(ret), 4)
     expect_equal(all(ret[est > 0, se] > 0), TRUE)
 
     ret <- mutual_difference(test_data1, test_data2, "g", "u", weight = "n",
                              method = "km", se = TRUE, n_bootstrap = 5)
     expect_equal(nrow(ret), 9)
-    expect_equal(ncol(ret), 3)
+    expect_equal(ncol(ret), 4)
     expect_equal(all(ret[est > 0, se] > 0), TRUE)
 
     ret <- mutual_difference(test_data1, test_data2, "g", "u", weight = "n",
                              method = "mrc", se = TRUE, n_bootstrap = 5)
     expect_equal(nrow(ret), 8)
-    expect_equal(ncol(ret), 3)
+    expect_equal(ncol(ret), 4)
     expect_equal(all(ret[est > 0, se] > 0), TRUE)
 })
 
-test_that("mutual_difference SHAPLEY detailed", {
+test_that("mutual_difference shapley_detailed", {
     diff_simple <- mutual_difference(schools05, schools00, group = "school", unit = "race",
         weight = "n", method = "shapley", precision = .000001)
     # note that the detailed decomposition requires high precision
@@ -186,7 +186,7 @@ test_that("mutual_difference SHAPLEY detailed", {
 
     expect_equal(nrow(diff_simple), 8)
     expect_equal(ncol(diff_simple), 2)
-    expect_equal(nrow(diff), 8 + length(unique(schools00$race)) * 5)
+    expect_equal(nrow(diff), 8 + length(unique(schools00$race)) * 6)
     expect_equal(ncol(diff), 3)
 
     # same with and without detail
@@ -202,7 +202,7 @@ test_that("mutual_difference SHAPLEY detailed", {
         weight = "n", method = "shapley_detailed", precision = .000001)
 
     schools_in_common <- intersect(schools00$school, schools05$school)
-    expect_equal(nrow(diff), 8 + length(schools_in_common) * 5)
+    expect_equal(nrow(diff), 8 + length(schools_in_common) * 6)
     expect_equal(ncol(diff), 3)
 
     wide <- dcast(diff[!is.na(school), ], school ~ stat, value.var = "est")
@@ -212,12 +212,12 @@ test_that("mutual_difference SHAPLEY detailed", {
 })
 
 
-test_that("mutual_difference SHAPLEY detailed with SE", {
+test_that("mutual_difference shapley_detailed with SE", {
     diff <- mutual_difference(schools05, schools00, group = "school", unit = "race",
         weight = "n", method = "shapley_detailed", precision = .1, se = TRUE, n_bootstrap = 2)
 
-    expect_equal(nrow(diff), 8 + length(unique(schools00$race)) * 5)
-    expect_equal(ncol(diff), 4)
+    expect_equal(nrow(diff), 8 + length(unique(schools00$race)) * 6)
+    expect_equal(ncol(diff), 5)
 })
 
 

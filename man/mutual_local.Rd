@@ -4,8 +4,16 @@
 \alias{mutual_local}
 \title{Calculates local segregation indices based on M}
 \usage{
-mutual_local(data, group, unit, weight = NULL, se = FALSE,
-  n_bootstrap = 100, base = exp(1), wide = FALSE)
+mutual_local(
+  data,
+  group,
+  unit,
+  weight = NULL,
+  se = FALSE,
+  n_bootstrap = 100,
+  base = exp(1),
+  wide = FALSE
+)
 }
 \arguments{
 \item{data}{A data frame.}
@@ -20,7 +28,9 @@ segregation indices are calculated.}
 
 \item{weight}{Numeric. (Default \code{NULL})}
 
-\item{se}{If \code{TRUE}, standard errors are estimated via bootstrap.
+\item{se}{If \code{TRUE}, the segregation estimates are bootstrapped to provide
+standard errors and to apply bias correction. The bias that is reported
+has already been applied to the estimates (i.e. the reported estimates are "debiased")
 (Default \code{FALSE})}
 
 \item{n_bootstrap}{Number of bootstrap iterations. (Default \code{100})}
@@ -38,8 +48,8 @@ Returns a data.table with two rows for each category defined by \code{unit},
   are provided for each unit: \code{ls}, the local segregation score, and
   \code{p}, the proportion of the unit from the total number of cases.
   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
-  the associated bootstrapped standard errors, and the column \code{est} contains
-  bootstrapped estimates.
+  the associated bootstrapped standard errors, an additional column \code{bias} contains
+  the estimated bias, and the column \code{est} contains the bias-corrected estimates.
   If \code{wide} is set to \code{TRUE}, returns instead a wide dataframe, with one
   row for each \code{unit}, and the associated statistics in separate columns.
 }

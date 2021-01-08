@@ -4,9 +4,18 @@
 \alias{mutual_difference}
 \title{Decomposes the difference between two M indices}
 \usage{
-mutual_difference(data1, data2, group, unit, weight = NULL,
-  method = "shapley", se = FALSE, n_bootstrap = 100, base = exp(1),
-  ...)
+mutual_difference(
+  data1,
+  data2,
+  group,
+  unit,
+  weight = NULL,
+  method = "shapley",
+  se = FALSE,
+  n_bootstrap = 100,
+  base = exp(1),
+  ...
+)
 }
 \arguments{
 \item{data1}{A data frame with same structure as \code{data2}.}
@@ -26,7 +35,9 @@ over which segregation is computed.}
 \item{method}{Either "shapley" (the default), "km" (Karmel and Maclachlan method), or
 "mrc" (Mora and Ruiz-Castillo method).}
 
-\item{se}{If \code{TRUE}, standard errors are estimated via bootstrap.
+\item{se}{If \code{TRUE}, the segregation estimates are bootstrapped to provide
+standard errors and to apply bias correction. The bias that is reported
+has already been applied to the estimates (i.e. the reported estimates are "debiased")
 (Default \code{FALSE})}
 
 \item{n_bootstrap}{Number of bootstrap iterations. (Default \code{100})}
@@ -59,19 +70,20 @@ Returns a data.table with columns \code{stat} and \code{est}. The data frame con
      of \code{unit} and \code{group}.
 
   When "shapley_detailed" is used, an additional column "unit" is returned, along with
-    five additional rows for each unit that is present in both \code{data1} and \code{data2}.
+    six additional rows for each unit that is present in both \code{data1} and \code{data2}.
     The five rows have the following meaning:
     \code{p1} (\code{p2}) is the proportion of the unit in \code{data1} (\code{data2})
     once non-intersecting units/groups have been removed. The changes in local linkage are
-    given by \code{ls_diff1} and \code{ls_diff2}. The row named \code{total}
+    given by \code{ls_diff1} and \code{ls_diff2}, and their average is given by
+    \code{ls_diff_mean}. The row named \code{total}
     summarizes the contribution of
     the unit towards structural change
     using the formula \code{.5 * p1 * ls_diff1 + .5 * p2 * ls_diff2}.
     The sum of all "total" components equals structural change.
 
   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
-  the associated bootstrapped standard errors, and the column \code{est} contains
-  bootstrapped estimates.
+  the associated bootstrapped standard errors, an additional column \code{bias} contains
+  the estimated bias, and the column \code{est} contains the bias-corrected estimates.
 }
 \description{
 Uses one of three methods to decompose the difference between two M indices:

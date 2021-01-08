@@ -1,7 +1,7 @@
 Package: segregation
 Type: Package
 Title: Entropy-Based Segregation Indices
-Version: 0.3.0
+Version: 0.4.0
 Authors@R: person("Benjamin", "Elbers", email = "be2239@columbia.edu",
   role = c("aut", "cre"), comment = c(ORCID = "0000-0001-5392-3448"))
 Description: Computes entropy-based segregation indices, as developed by
@@ -17,13 +17,13 @@ License: MIT + file LICENSE
 Imports: data.table
 Encoding: UTF-8
 LazyData: true
-Suggests: testthat, covr, lintr
-URL: http://github.com/elbersb/segregation
-BugReports: http://github.com/elbersb/segregation/issues
-RoxygenNote: 6.1.1
+Suggests: testthat, covr
+URL: https://github.com/elbersb/segregation
+BugReports: https://github.com/elbersb/segregation/issues
+RoxygenNote: 7.1.0
 NeedsCompilation: no
-Packaged: 2019-09-20 02:11:55 UTC; benjamin
+Packaged: 2021-01-08 12:41:43 UTC; benjamin
 Author: Benjamin Elbers [aut, cre] (<https://orcid.org/0000-0001-5392-3448>)
 Maintainer: Benjamin Elbers <be2239@columbia.edu>
 Repository: CRAN
-Date/Publication: 2019-09-20 04:50:05 UTC
+Date/Publication: 2021-01-08 14:50:03 UTC
