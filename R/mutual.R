@@ -53,19 +53,19 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
         M = sum(p_unit * (entropyw - entropy_cond)),
         p = first(p_within),
         H = sum(p_unit * (entropyw - entropy_cond)) / first(entropyw),
-        h_weight = first(p_within) * first(entropyw) / entropy_overall
+        ent_ratio = first(entropyw) / entropy_overall
     ), by = within]
     by_within$H <- ifelse(is.finite(by_within$H), by_within$H, 0)
 
     if (components == TRUE) {
         melt(by_within,
-             id.vars = within, measure.vars = c("M", "p", "H", "h_weight"),
+             id.vars = within, measure.vars = c("M", "p", "H", "ent_ratio"),
              variable.name = "stat", value.name = "est",
              variable.factor = FALSE)
     } else {
         # total M is the sum of weighted within-group partial M
-        M <- sum(by_within$M %*% by_within$p)
-        H <- sum(by_within$H %*% by_within$h_weight)
+        M <- sum(by_within$M * by_within$p)
+        H <- sum(by_within$H * by_within$p * by_within$ent_ratio)
         data.table(stat = c("M", "H"), est = c(M, H), stringsAsFactors = FALSE)
     }
 }
@@ -95,6 +95,10 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
 #'   standard errors and to apply bias correction. The bias that is reported
 #'   has already been applied to the estimates (i.e. the reported estimates are "debiased")
 #'   (Default \code{FALSE})
+#' @param CI If \code{se = TRUE}, compute the confidence (CI*100)% confidence interval
+#'   in addition to the bootstrap standard error.
+#'   This is based on percentiles of the bootstrap distribution, and a valid interpretation
+#'   relies on a larger number of bootstrap iterations. (Default \code{0.95})
 #' @param n_bootstrap Number of bootstrap iterations. (Default \code{100})
 #' @param base Base of the logarithm that is used in the calculation.
 #'   Defaults to the natural logarithm.
@@ -103,7 +107,8 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
 #'   the M divided by the \code{group} entropy. If \code{within} was given,
 #'   M and H are weighted averages of the within-category segregation scores.
 #'   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
-#'   the associated bootstrapped standard errors, an additional column \code{bias} contains
+#'   the associated bootstrapped standard errors, an additional column \code{CI} contains
+#'   the estimate confidence interval as a list column, an additional column \code{bias} contains
 #'   the estimated bias, and the column \code{est} contains the bias-corrected estimates.
 #' @references
 #' Henri Theil. 1971. Principles of Econometrics. New York: Wiley.
@@ -124,8 +129,11 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
 #' mutual_total(schools00, "race", c("district", "school"),
 #'              weight = "n") # M => .424
 #'
-#' # estimate standard errors for M and H
-#' mutual_total(schools00, "race", "school", weight = "n", se = TRUE, n_bootstrap = 10)
+#' # estimate standard errors and 95% CI for M and H
+#' \dontrun{
+#' mutual_total(schools00, "race", "school", weight = "n",
+#'              se = TRUE, n_bootstrap = 1000)
+#' }
 #'
 #' # estimate segregation within school districts
 #' mutual_total(schools00, "race", "school",
@@ -139,7 +147,8 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
 #' @import data.table
 #' @export
 mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
-                         se = FALSE, n_bootstrap = 100, base = exp(1)) {
+                         se = FALSE, CI = 0.95, n_bootstrap = 100, base = exp(1)) {
+    stopifnot(CI > 0 & CI < 1)
     d <- prepare_data(data, group, unit, weight, within)
 
     if (is.null(within)) {
@@ -174,17 +183,10 @@ mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
         })
         close_log()
         boot_ret <- rbindlist(boot_ret)
-        ret_boot <- boot_ret[, list(
-            mean_boot = mean(est), se = stats::sd(est)), by = c("stat")]
-        ret <- merge(ret, ret_boot, by = "stat", sort = FALSE)
-        # debias
-        ret[, bias := mean_boot - est]
-        ret[, est := est - bias]
-        ret[, mean_boot := NULL]
+        ret <- bootstrap_summary(ret, boot_ret, "stat", CI)
         setattr(ret, "bootstrap", boot_ret)
     }
-
-    data.table(ret)
+    ret
 }
 
 #' Calculate detailed within-category segregation scores for M and H
@@ -206,6 +208,10 @@ mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
 #'   standard errors and to apply bias correction. The bias that is reported
 #'   has already been applied to the estimates (i.e. the reported estimates are "debiased")
 #'   (Default \code{FALSE})
+#' @param CI If \code{se = TRUE}, compute the confidence (CI*100)% confidence interval
+#'   in addition to the bootstrap standard error.
+#'   This is based on percentiles of the bootstrap distribution, and a valid interpretation
+#'   relies on a larger number of bootstrap iterations. (Default \code{0.95})
 #' @param n_bootstrap Number of bootstrap iterations. (Default \code{100})
 #' @param base Base of the logarithm that is used in the calculation.
 #'   Defaults to the natural logarithm.
@@ -217,12 +223,14 @@ mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
 #'   \code{M} is the within-category M, and \code{p} is the proportion of the category.
 #'   Multiplying \code{M} and \code{p} gives the contribution of each within-category
 #'   towards the total M.
-#'   \code{H} is the within-category H, and \code{h_weight} provides the weight.
-#'   Multiplying \code{H} and \code{h_weight} gives the contribution of each within-category
-#'   towards the total H. \code{h_weight} is defined as \code{p * EW/E}, where \code{EW} is the
-#'   within-category entropy, and \code{E} is the overall entropy.
+#'   \code{H} is the within-category H, and \code{ent_ratio} provides the entropy ratio,
+#'   defined as \code{EW/E}, where \code{EW} is the within-category entropy,
+#'   and \code{E} is the overall entropy.
+#'   Multiplying \code{H}, \code{p}, and \code{ent_ratio} gives the contribution of each within-category
+#'   towards the total H.
 #'   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
-#'   the associated bootstrapped standard errors, an additional column \code{bias} contains
+#'   the associated bootstrapped standard errors, an additional column \code{CI} contains
+#'   the estimate confidence interval as a list column, an additional column \code{bias} contains
 #'   the estimated bias, and the column \code{est} contains the bias-corrected estimates.
 #'   If \code{wide} is set to \code{TRUE}, returns instead a wide dataframe, with one
 #'   row for each \code{within} category, and the associated statistics in separate columns.
@@ -240,16 +248,17 @@ mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
 #' mutual_total(schools_A, "race", "school", weight = "n") # M => .409
 #'
 #' # to recover the within M and H from the output, multiply
-#' # p * M and h_weight * H, respectively
+#' # p * M and p * ent_ratio * H, respectively
 #' sum(within$p * within$M) # => .326
-#' sum(within$H * within$h_weight) # => .321
+#' sum(within$p * within$ent_ratio * within$H) # => .321
 #' # compare with:
 #' mutual_total(schools00, "race", "school", within = "state", weight = "n")
 #' @import data.table
 #' @export
 mutual_within <- function(data, group, unit, within,
-                         weight = NULL, se = FALSE, n_bootstrap = 100, base = exp(1),
+                         weight = NULL, se = FALSE, CI = 0.95, n_bootstrap = 100, base = exp(1),
                          wide = FALSE) {
+    stopifnot(CI > 0 & CI < 1)
     d <- prepare_data(data, group, unit, weight, within)
 
     ret <- mutual_total_within_compute(d, group, unit, within, base, components = TRUE)
@@ -276,38 +285,32 @@ mutual_within <- function(data, group, unit, within,
         })
         close_log()
         boot_ret <- rbindlist(boot_ret)
-        ret_boot <- boot_ret[, list(mean_boot = mean(est), se = stats::sd(est)),
-            by = c(within, "stat")]
-        ret <- merge(ret, ret_boot, by = c(within, "stat"), sort = FALSE)
-        # debias
-        ret[, bias := mean_boot - est]
-        ret[, est := est - bias]
-        ret[, mean_boot := NULL]
+        ret <- bootstrap_summary(ret, boot_ret, c(within, "stat"), CI)
         setattr(ret, "bootstrap", boot_ret)
     }
 
     if (wide == TRUE) {
         f <- stats::as.formula(paste(paste(within, collapse = "+"),
-                                     "~ factor(stat, levels=c('M', 'p', 'H', 'h_weight'))"))
+                                     "~ factor(stat, levels=c('M', 'p', 'H', 'ent_ratio'))"))
         if (se == TRUE) {
-            ret <- dcast(ret, f, value.var = c("est", "se", "bias"))
+            ret <- dcast(ret, f, value.var = c("est", "se", "CI", "bias"))
             names(ret) <- c(within,
-                            "M", "p", "H", "h_weight",
-                            "M_se", "p_se", "H_se", "h_weight_se",
-                            "M_bias", "p_bias", "H_bias", "h_weight_bias")
+                            "M", "p", "H", "ent_ratio",
+                            "M_se", "p_se", "H_se", "ent_ratio_se",
+                            "M_CI", "p_CI", "H_CI", "ent_ratio_CI",
+                            "M_bias", "p_bias", "H_bias", "ent_ratio_bias")
             setcolorder(ret, c(within,
-                               "M", "M_se", "M_bias",
-                               "p", "p_se", "p_bias",
-                               "H", "H_se", "H_bias",
-                               "h_weight", "h_weight_se",
-                               "h_weight_bias"))
+                               "M", "M_se", "M_CI", "M_bias",
+                               "p", "p_se", "p_CI", "p_bias",
+                               "H", "H_se", "H_CI", "H_bias",
+                               "ent_ratio", "ent_ratio_se", "ent_ratio_CI", "ent_ratio_bias"))
             setattr(ret, "bootstrap", boot_ret)
         } else {
             ret <- dcast(ret, f, value.var = c("est"))
         }
     }
 
-    data.table(ret)
+    ret
 }
 
 #' @import data.table
@@ -339,6 +342,10 @@ mutual_local_compute <- function(data, group, unit, base = exp(1)) {
 #'   standard errors and to apply bias correction. The bias that is reported
 #'   has already been applied to the estimates (i.e. the reported estimates are "debiased")
 #'   (Default \code{FALSE})
+#' @param CI If \code{se = TRUE}, compute the confidence (CI*100)% confidence interval
+#'   in addition to the bootstrap standard error.
+#'   This is based on percentiles of the bootstrap distribution, and a valid interpretation
+#'   relies on a larger number of bootstrap iterations. (Default \code{0.95})
 #' @param n_bootstrap Number of bootstrap iterations. (Default \code{100})
 #' @param base Base of the logarithm that is used in the calculation.
 #'   Defaults to the natural logarithm.
@@ -350,7 +357,8 @@ mutual_local_compute <- function(data, group, unit, base = exp(1)) {
 #'   are provided for each unit: \code{ls}, the local segregation score, and
 #'   \code{p}, the proportion of the unit from the total number of cases.
 #'   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
-#'   the associated bootstrapped standard errors, an additional column \code{bias} contains
+#'   the associated bootstrapped standard errors, an additional column \code{CI} contains
+#'   the estimate confidence interval as a list column, an additional column \code{bias} contains
 #'   the estimated bias, and the column \code{est} contains the bias-corrected estimates.
 #'   If \code{wide} is set to \code{TRUE}, returns instead a wide dataframe, with one
 #'   row for each \code{unit}, and the associated statistics in separate columns.
@@ -373,8 +381,9 @@ mutual_local_compute <- function(data, group, unit, base = exp(1)) {
 #' @import data.table
 #' @export
 mutual_local <- function(data, group, unit, weight = NULL,
-                         se = FALSE, n_bootstrap = 100, base = exp(1),
+                         se = FALSE, CI = 0.95, n_bootstrap = 100, base = exp(1),
                          wide = FALSE) {
+    stopifnot(CI > 0 & CI < 1)
     d <- prepare_data(data, group, unit, weight)
 
     ret <- mutual_local_compute(d, group, unit, base)
@@ -401,13 +410,7 @@ mutual_local <- function(data, group, unit, weight = NULL,
         })
         close_log()
         boot_ret <- rbindlist(boot_ret)
-        ret_boot <- boot_ret[, list(mean_boot = mean(est), se = stats::sd(est)),
-            by = c(unit, "stat")]
-        ret <- merge(ret, ret_boot, by = c(unit, "stat"), sort = FALSE)
-        # debias
-        ret[, bias := mean_boot - est]
-        ret[, est := est - bias]
-        ret[, mean_boot := NULL]
+        ret <- bootstrap_summary(ret, boot_ret, c(unit, "stat"), CI)
         setattr(ret, "bootstrap", boot_ret)
     }
 
@@ -415,14 +418,19 @@ mutual_local <- function(data, group, unit, weight = NULL,
         f <- stats::as.formula(paste(paste(unit, collapse = "+"),
                                      "~ factor(stat, levels=c('ls', 'p'))"))
         if (se == TRUE) {
-            ret <- dcast(ret, f, value.var = c("est", "se", "bias"))
-            names(ret) <- c(unit, "ls", "p", "ls_se", "p_se", "ls_bias", "p_bias")
-            setcolorder(ret, c(unit, "ls", "ls_se", "ls_bias", "p", "p_se", "p_bias"))
+            ret <- dcast(ret, f, value.var = c("est", "se", "CI", "bias"))
+            names(ret) <- c(unit, "ls", "p",
+                "ls_se", "p_se",
+                "ls_CI", "p_CI",
+                "ls_bias", "p_bias")
+            setcolorder(ret, c(unit,
+                "ls", "ls_se", "ls_CI", "ls_bias",
+                "p", "p_se", "p_CI", "p_bias"))
             setattr(ret, "bootstrap", boot_ret)
         } else {
             ret <- dcast(ret, f, value.var = c("est"))
         }
     }
 
-    data.table(ret)
+    ret
 }

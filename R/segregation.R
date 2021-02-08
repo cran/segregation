@@ -14,7 +14,7 @@ NULL
 globalVariables(c(
     "V1", "V2", "cond1", "cond2", "entropy_cond", "entropy_cond1", "entropy_cond2", "entropyw",
     "est", "freq", "freq1", "freq2", "freq_orig1", "freq_orig2",
-    "ls_diff_mean", "ls_diff1", "ls_diff2", "ls_unit", "bias", "mean_boot",
+    "ls_diff_mean", "ls_diff1", "ls_diff2", "ls_unit", "bias", "boot_est", "est_debiased",
     "n", "n_group", "n_group_target", "n_source", "n_target", "n_unit", "n_unit_target",
     "n_within_group", "p", "p_exp", "p1", "p2", "p_group", "p_group_g_unit", "p_group_g_unit1",
     "p_group_g_unit2", "p_group_s", "p_group_t", "p_unit", "p_unit1", "p_unit2", "p_unit_s",
@@ -143,7 +143,11 @@ prepare_data <- function(data, group, unit, weight, within = NULL) {
 
     # use provided weight or weight of 1
     if (!is.null(weight)) {
-        data[, freq := as.double(get(weight))]
+        if (weight == "weight") {
+            data[, freq := as.double(weight)]
+        } else {
+            data[, freq := as.double(get(weight))]
+        }
     } else {
         data[, freq := 1]
     }
@@ -176,4 +180,58 @@ add_local <- function(data, group, unit, base, weight = "freq") {
     # calculate local linkage, i.e. log(cond.) * log(cond./marginal)
     data[, ls_unit := sum(p_group_g_unit * logf(p_group_g_unit / p_group, base)),
            by = unit]
+}
+
+#' @import data.table
+bootstrap_summary <- function(ret, boot_ret, cols, CI) {
+    setnames(boot_ret, "est", "boot_est")
+    ret <- merge(ret, boot_ret, by = cols, sort = FALSE)
+    # create a "debiased" version of bootstrap estimates
+    ret[, est_debiased := 2 * est - boot_est, by = cols]
+    pct <- c((1 - CI) / 2, 1 - (1 - CI) / 2)
+    # estimate the "debiased" mean, standard error, CI, and quantify bias
+    ret <- ret[, list(
+        est = mean(est_debiased),
+        se = stats::sd(est_debiased),
+        CI = list(stats::quantile(est_debiased, pct)),
+        bias = first(est) - mean(est_debiased)), by = cols]
+    ret[]
+}
+
+#' Turns a contingency table into long format
+#'
+#' Returns a data.table in long form, such that it is suitable
+#' for use in \link{mutual_total}, etc. Colnames and rownames of
+#' the matrix will be respected.
+#'
+#' @param matrix A matrix, where the rows represent the units, and the
+#'    column represent the groups.
+#' @param group Variable name for group. (Default \code{group})
+#' @param unit Variable name for unit. (Default \code{unit})
+#' @param weight Variable name for frequency weight. (Default \code{weight})
+#' @param drop_zero Drop unit-group combinations with zero weight. (Default \code{TRUE})
+#' @return A data.table.
+#' @examples
+#' m = matrix(c(10, 20, 30, 30, 20, 10), nrow = 3)
+#' colnames(m) <- c("Black", "White")
+#' long = matrix_to_long(m, group = "race", unit = "school")
+#' mutual_total(long, "race", "school", weight = "n")
+#' @import data.table
+#' @export
+matrix_to_long <- function(matrix, group = "group", unit = "unit",
+                           weight = "n", drop_zero = TRUE) {
+    if (!is.matrix(matrix)) stop("matrix needs be a matrix object")
+    if (is.null(rownames(matrix))) rownames(matrix) <- 1:nrow(matrix)
+    if (is.null(colnames(matrix))) colnames(matrix) <- 1:ncol(matrix)
+    d <- as.data.table(matrix, keep.rownames = unit)
+    long <- melt(d, id.vars = unit,
+                 variable.name = group,
+                 variable.factor = FALSE,
+                 value.name = weight)
+    if (drop_zero == TRUE) {
+        ind <- long[[weight]] > 0
+        long[ind]
+    } else {
+        long
+    }
 }

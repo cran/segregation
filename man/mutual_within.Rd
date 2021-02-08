@@ -11,6 +11,7 @@ mutual_within(
   within,
   weight = NULL,
   se = FALSE,
+  CI = 0.95,
   n_bootstrap = 100,
   base = exp(1),
   wide = FALSE
@@ -37,6 +38,11 @@ standard errors and to apply bias correction. The bias that is reported
 has already been applied to the estimates (i.e. the reported estimates are "debiased")
 (Default \code{FALSE})}
 
+\item{CI}{If \code{se = TRUE}, compute the confidence (CI*100)% confidence interval
+in addition to the bootstrap standard error.
+This is based on percentiles of the bootstrap distribution, and a valid interpretation
+relies on a larger number of bootstrap iterations. (Default \code{0.95})}
+
 \item{n_bootstrap}{Number of bootstrap iterations. (Default \code{100})}
 
 \item{base}{Base of the logarithm that is used in the calculation.
@@ -52,12 +58,14 @@ Returns a data.table with four rows for each category defined by \code{within}.
   \code{M} is the within-category M, and \code{p} is the proportion of the category.
   Multiplying \code{M} and \code{p} gives the contribution of each within-category
   towards the total M.
-  \code{H} is the within-category H, and \code{h_weight} provides the weight.
-  Multiplying \code{H} and \code{h_weight} gives the contribution of each within-category
-  towards the total H. \code{h_weight} is defined as \code{p * EW/E}, where \code{EW} is the
-  within-category entropy, and \code{E} is the overall entropy.
+  \code{H} is the within-category H, and \code{ent_ratio} provides the entropy ratio,
+  defined as \code{EW/E}, where \code{EW} is the within-category entropy,
+  and \code{E} is the overall entropy.
+  Multiplying \code{H}, \code{p}, and \code{ent_ratio} gives the contribution of each within-category
+  towards the total H.
   If \code{se} is set to \code{TRUE}, an additional column \code{se} contains
-  the associated bootstrapped standard errors, an additional column \code{bias} contains
+  the associated bootstrapped standard errors, an additional column \code{CI} contains
+  the estimate confidence interval as a list column, an additional column \code{bias} contains
   the estimated bias, and the column \code{est} contains the bias-corrected estimates.
   If \code{wide} is set to \code{TRUE}, returns instead a wide dataframe, with one
   row for each \code{within} category, and the associated statistics in separate columns.
@@ -75,9 +83,9 @@ schools_A <- schools00[schools00$state=="A",]
 mutual_total(schools_A, "race", "school", weight = "n") # M => .409
 
 # to recover the within M and H from the output, multiply
-# p * M and h_weight * H, respectively
+# p * M and p * ent_ratio * H, respectively
 sum(within$p * within$M) # => .326
-sum(within$H * within$h_weight) # => .321
+sum(within$p * within$ent_ratio * within$H) # => .321
 # compare with:
 mutual_total(schools00, "race", "school", within = "state", weight = "n")
 }

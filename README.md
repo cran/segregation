@@ -1,4 +1,3 @@
-
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 # segregation
@@ -12,14 +11,16 @@ status](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)
 
 An R package to calculate and decompose entropy-based, multigroup
 segregation indices, with a focus on the Mutual Information Index (M)
-and Theil’s Information Index (H).
+and Theil’s Information Index (H). The index of Dissimilarity (D) is
+also supported.
 
 Find more information in the
-[documentation](https://elbersb.de/segregation).
+[vignette](https://elbersb.github.io/segregation/articles/segregation.html)
+and the [documentation](https://elbersb.de/segregation).
 
 -   calculate total, between, within, and local segregation
--   decompose differences in total segregation over time
--   estimate standard errors via bootstrapping
+-   decompose differences in total segregation over time (Elbers 2020)
+-   estimate standard errors and confidence intervals via bootstrapping
 -   every method returns a
     [tidy](https://vita.had.co.nz/papers/tidy-data.html)
     [data.table](https://rdatatable.gitlab.io/data.table/) for easy
@@ -29,8 +30,9 @@ Find more information in the
     internally
 
 Most of the procedures implemented in this package are described in more
-detail [in this working
-paper](https://osf.io/preprints/socarxiv/ya7zs/).
+detail [in this SMR
+paper](https://journals.sagepub.com/doi/full/10.1177/0049124121986204)
+([Preprint](https://osf.io/preprints/socarxiv/ya7zs/)).
 
 ## Usage
 
@@ -42,20 +44,21 @@ library(segregation)
 
 # example dataset with fake data provided by the package
 mutual_total(schools00, "race", "school", weight = "n")
-#>  stat   est
-#>     M 0.426
-#>     H 0.419
+#>    stat   est
+#> 1:    M 0.426
+#> 2:    H 0.419
 ```
 
 Standard errors in all functions can be estimated via boostrapping. This
 will also apply bias-correction to the estimates:
 
 ``` r
-mutual_total(schools00, "race", "school", weight = "n", se = TRUE)
-#> 100 bootstrap iterations on 877739 observations
-#>  stat   est       se    bias
-#>     M 0.422 0.000796 0.00352
-#>     H 0.415 0.000689 0.00356
+mutual_total(schools00, "race", "school", weight = "n",
+             se = TRUE, CI = 0.90, n_bootstrap = 500)
+#> 500 bootstrap iterations on 877739 observations
+#>    stat   est       se          CI    bias
+#> 1:    M 0.422 0.000788 0.421,0.423 0.00362
+#> 2:    H 0.415 0.000719 0.414,0.416 0.00357
 ```
 
 Decompose segregation into a between-state and a within-state term (the
@@ -64,32 +67,33 @@ sum of these equals total segregation):
 ``` r
 # between states
 mutual_total(schools00, "race", "state", weight = "n")
-#>  stat    est
-#>     M 0.0992
-#>     H 0.0977
+#>    stat    est
+#> 1:    M 0.0992
+#> 2:    H 0.0977
 
 # within states
 mutual_total(schools00, "race", "school", within = "state", weight = "n")
-#>  stat   est
-#>     M 0.326
-#>     H 0.321
+#>    stat   est
+#> 1:    M 0.326
+#> 2:    H 0.321
 ```
 
-Local segregation (`ls`) is a decomposition by units (here racial
-groups). The sum of the proportion-weighted local segregation scores
+Local segregation (`ls`) is a decomposition by units or groups (here
+racial groups). This function also support standard error and CI
+estimation. The sum of the proportion-weighted local segregation scores
 equals M:
 
 ``` r
-(local <- mutual_local(schools00, group = "school", unit = "race", weight = "n",
-             se = TRUE, wide = TRUE))
-#> 100 bootstrap iterations on 877739 observations
-#>    race    ls    ls_se  ls_bias       p      p_se      p_bias
-#>   asian 0.591 0.005636 0.037269 0.02253 0.0001459  0.00002652
-#>   black 0.876 0.002080 0.004634 0.19019 0.0003918 -0.00004009
-#>    hisp 0.771 0.002116 0.005306 0.15165 0.0004028  0.00004914
-#>   white 0.183 0.000518 0.000607 0.62812 0.0005175 -0.00003223
-#>  native 1.350 0.016045 0.084480 0.00751 0.0000854 -0.00000334
-
+local <- mutual_local(schools00, group = "school", unit = "race", weight = "n",
+             se = TRUE, CI = 0.90, n_bootstrap = 500, wide = TRUE)
+#> 500 bootstrap iterations on 877739 observations
+local[, c("race", "ls", "p", "ls_CI")]
+#>      race    ls       p       ls_CI
+#> 1:  asian 0.591 0.02255 0.581,0.600
+#> 2:  black 0.876 0.19015 0.872,0.879
+#> 3:   hisp 0.771 0.15171 0.767,0.775
+#> 4:  white 0.183 0.62808 0.182,0.184
+#> 5: native 1.351 0.00751   1.32,1.38
 sum(local$p * local$ls)
 #> [1] 0.422
 ```
@@ -101,19 +105,19 @@ by Karmel and Maclachlan (1988) and Deutsch et al. (2006):
 ``` r
 mutual_difference(schools00, schools05, group = "race", unit = "school",
                   weight = "n", method = "shapley")
-#>            stat      est
-#>              M1  0.42554
-#>              M2  0.41339
-#>            diff -0.01215
-#>       additions -0.00341
-#>        removals -0.01141
-#>  group_marginal  0.01787
-#>   unit_marginal -0.01171
-#>      structural -0.00349
+#>              stat      est
+#> 1:             M1  0.42554
+#> 2:             M2  0.41339
+#> 3:           diff -0.01215
+#> 4:      additions -0.00341
+#> 5:       removals -0.01141
+#> 6: group_marginal  0.01787
+#> 7:  unit_marginal -0.01171
+#> 8:     structural -0.00349
 ```
 
 Find more information in the
-[documentation](https://elbersb.de/segregation).
+[vignette](https://elbersb.github.io/segregation/articles/segregation.html).
 
 ## How to install
 
@@ -161,9 +165,9 @@ Flückiger, Sean F. Reardon, Jacques Silber (eds.) Occupational and
 Residential Segregation (Research on Economic Inequality, Volume 17),
 171–202.
 
-Elbers, B. (2019). A Method for Studying Difference in Segregation
-Levels Across Time and Space. SocArXiv Working Paper.
-<https://osf.io/preprints/socarxiv/ya7zs/>
+Elbers, B. (2021). A Method for Studying Differences in Segregation
+Across Time and Space. Sociological Methods & Research.
+<https://doi.org/10.1177/0049124121986204>
 
 Theil, H. (1971). Principles of Econometrics. New York: Wiley.
 
