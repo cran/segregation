@@ -63,7 +63,7 @@ mutual_local(schools00, "race", "school", weight = "n", wide = TRUE)
 ## -----------------------------------------------------------------------------
 localse <- mutual_local(schools00, "race", "school", weight = "n",
                         se = TRUE, wide = TRUE, n_bootstrap = 1000)
-localse$lengthCI <- sapply(localse$ls_CI, diff)
+localse$lengthCI <- sapply(localse$ls_CI, base::diff)
 with(localse, plot(x = p, y = lengthCI, pch = 16, cex = 0.3))
 
 ## -----------------------------------------------------------------------------
@@ -85,6 +85,9 @@ local <- mutual_local(schools00, "race", "school", weight = "n",
 # pick bootstrap distribution of local segregation scores for school C137_9
 ls_school <- attr(local, "bootstrap")[school == "C137_9" & stat == "ls", boot_est]
 hist(ls_school, main = "Bootstrap distribution for school C137_9")
+
+## -----------------------------------------------------------------------------
+mutual_expected(schools00, "race", "school", weight = "n", n_bootstrap = 500)
 
 ## -----------------------------------------------------------------------------
 mutual_difference(schools00, schools05, "race", "school", weight = "n")

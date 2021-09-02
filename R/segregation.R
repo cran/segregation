@@ -110,7 +110,7 @@ logf <- function(v, base) {
 entropy <- function(data, group, weight = NULL, base = exp(1)) {
     # use provided weight
     if (!is.null(weight)) {
-        data[, "freq"] <- data[, weight]
+        data[, "freq"] <- data[[weight]]
     } else {
         data[, "freq"] <- 1
     }
@@ -141,12 +141,19 @@ prepare_data <- function(data, group, unit, weight, within = NULL) {
     # create a copy
     data <- as.data.table(data)
 
+    # check whether there is variation
+    n_groups <- nrow(data[, .N, by = group])
+    n_units <- nrow(data[, .N, by = unit])
+    if (n_groups == 1) stop("Cannot compute segregation: the group variable is constant")
+    if (n_units == 1) stop("Cannot compute segregation: the unit variable is constant")
+
     # use provided weight or weight of 1
-    if (!is.null(weight)) {
-        if (weight == "weight") {
+    weight_no_conflict <- weight
+    if (!is.null(weight_no_conflict)) {
+        if (weight_no_conflict == "weight") {
             data[, freq := as.double(weight)]
         } else {
-            data[, freq := as.double(get(weight))]
+            data[, freq := as.double(get(weight_no_conflict))]
         }
     } else {
         data[, freq := 1]
