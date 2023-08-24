@@ -9,6 +9,7 @@ mutual_expected(
   group,
   unit,
   weight = NULL,
+  within = NULL,
   fixed_margins = TRUE,
   n_bootstrap = 100,
   base = exp(1)
@@ -26,6 +27,9 @@ contained in \code{data}. Defines the second dimension
 over which segregation is computed.}
 
 \item{weight}{Numeric. (Default \code{NULL})}
+
+\item{within}{Apply algorithm within each group defined by this variable,
+and report the weighted average. (Default \code{NULL})}
 
 \item{fixed_margins}{Should the margins be fixed or simulated? (Default \code{TRUE})}
 
@@ -47,17 +51,20 @@ and calculates segregation. If the expected values are large,
 the interpretation of index scores might have to be adjusted.
 }
 \examples{
+\dontrun{
 # the schools00 dataset has a large sample size, so expected segregation is close to zero
 mutual_expected(schools00, "race", "school", weight = "n")
 
 # but we can build a smaller table, with 100 students distributed across
 # 10 schools, where one racial group has 10\% of the students
 small <- data.frame(
-          school = c(1:10, 1:10),
-          race = c(rep("r1", 10), rep("r2", 10)),
-          n = c(rep(1, 10), rep(9, 10)))
-mutual_expected(small, "race", "school", weight= "n")
+    school = c(1:10, 1:10),
+    race = c(rep("r1", 10), rep("r2", 10)),
+    n = c(rep(1, 10), rep(9, 10))
+)
+mutual_expected(small, "race", "school", weight = "n")
 # with an increase in sample size (n=1000), the values improve
 small$n <- small$n * 10
-mutual_expected(small, "race", "school", weight= "n")
+mutual_expected(small, "race", "school", weight = "n")
+}
 }

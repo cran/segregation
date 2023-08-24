@@ -7,7 +7,7 @@ Version](https://www.r-pkg.org/badges/version/segregation)](https://CRAN.R-proje
 [![R build
 status](https://github.com/elbersb/segregation/workflows/R-CMD-check/badge.svg)](https://github.com/elbersb/segregation/actions)
 [![Coverage
-status](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)](https://codecov.io/github/elbersb/segregation?branch=master)
+status](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)](https://app.codecov.io/github/elbersb/segregation?branch=master)
 
 An R package to calculate and decompose entropy-based, multigroup
 segregation indices, with a focus on the Mutual Information Index (M)
@@ -18,10 +18,17 @@ Find more information in the
 [vignette](https://elbersb.github.io/segregation/articles/segregation.html)
 and the [documentation](https://elbersb.de/segregation).
 
--   calculate total, between, within, and local segregation
+-   calculate total, between, within, and local segregation using the
+    M/H indices
 -   decompose differences in total segregation over time (Elbers 2020)
+-   other supported indices are the dissimilarity, isolation, and
+    exposure indices
+-   supports [segregation
+    visualizations](https://elbersb.github.io/segregation/articles/plotting.html)
+    (segregation curves and ‘segplots’)
 -   estimate standard errors and confidence intervals via bootstrapping,
     which also corrects for small sample bias
+-   contains functions to visualize segregation patterns
 -   every method returns a
     [tidy](https://vita.had.co.nz/papers/tidy-data.html)
     [data.table](https://rdatatable.gitlab.io/data.table/) for easy
@@ -32,7 +39,8 @@ and the [documentation](https://elbersb.de/segregation).
 Most of the procedures implemented in this package are described in more
 detail [in this SMR
 paper](https://journals.sagepub.com/doi/full/10.1177/0049124121986204)
-([Preprint](https://osf.io/preprints/socarxiv/ya7zs/)).
+([Preprint](https://osf.io/preprints/socarxiv/ya7zs/)) and [in this
+working paper](https://osf.io/preprints/socarxiv/ruw4g/).
 
 ## Usage
 
@@ -44,21 +52,25 @@ library(segregation)
 
 # example dataset with fake data provided by the package
 mutual_total(schools00, "race", "school", weight = "n")
-#>    stat   est
-#> 1:    M 0.426
-#> 2:    H 0.419
+#>      stat   est
+#>    <char> <num>
+#> 1:      M 0.426
+#> 2:      H 0.419
 ```
 
 Standard errors in all functions can be estimated via boostrapping. This
 will also apply bias-correction to the estimates:
 
 ``` r
-mutual_total(schools00, "race", "school", weight = "n",
-             se = TRUE, CI = 0.90, n_bootstrap = 500)
+mutual_total(schools00, "race", "school",
+    weight = "n",
+    se = TRUE, CI = 0.90, n_bootstrap = 500
+)
 #> 500 bootstrap iterations on 877739 observations
-#>    stat   est       se          CI    bias
-#> 1:    M 0.422 0.000775 0.421,0.423 0.00361
-#> 2:    H 0.415 0.000712 0.414,0.416 0.00356
+#>      stat   est       se          CI    bias
+#>    <char> <num>    <num>      <list>   <num>
+#> 1:      M 0.422 0.000775 0.421,0.423 0.00361
+#> 2:      H 0.415 0.000712 0.414,0.416 0.00356
 ```
 
 Decompose segregation into a between-state and a within-state term (the
@@ -67,15 +79,17 @@ sum of these equals total segregation):
 ``` r
 # between states
 mutual_total(schools00, "race", "state", weight = "n")
-#>    stat    est
-#> 1:    M 0.0992
-#> 2:    H 0.0977
+#>      stat    est
+#>    <char>  <num>
+#> 1:      M 0.0992
+#> 2:      H 0.0977
 
 # within states
 mutual_total(schools00, "race", "school", within = "state", weight = "n")
-#>    stat   est
-#> 1:    M 0.326
-#> 2:    H 0.321
+#>      stat   est
+#>    <char> <num>
+#> 1:      M 0.326
+#> 2:      H 0.321
 ```
 
 Local segregation (`ls`) is a decomposition by units or groups (here
@@ -84,11 +98,14 @@ estimation. The sum of the proportion-weighted local segregation scores
 equals M:
 
 ``` r
-local <- mutual_local(schools00, group = "school", unit = "race", weight = "n",
-             se = TRUE, CI = 0.90, n_bootstrap = 500, wide = TRUE)
+local <- mutual_local(schools00,
+    group = "school", unit = "race", weight = "n",
+    se = TRUE, CI = 0.90, n_bootstrap = 500, wide = TRUE
+)
 #> 500 bootstrap iterations on 877739 observations
 local[, c("race", "ls", "p", "ls_CI")]
 #>      race    ls       p       ls_CI
+#>    <fctr> <num>   <num>      <list>
 #> 1:  asian 0.591 0.02255 0.582,0.601
 #> 2:  black 0.876 0.19017 0.873,0.879
 #> 3:   hisp 0.771 0.15167 0.767,0.775
@@ -103,9 +120,12 @@ proportional fitting (IPF) and the Shapley decomposition (see Elbers
 2021 for details):
 
 ``` r
-mutual_difference(schools00, schools05, group = "race", unit = "school",
-                  weight = "n", method = "shapley")
+mutual_difference(schools00, schools05,
+    group = "race", unit = "school",
+    weight = "n", method = "shapley"
+)
 #>              stat      est
+#>            <char>    <num>
 #> 1:             M1  0.42554
 #> 2:             M2  0.41339
 #> 3:           diff -0.01215
@@ -116,8 +136,16 @@ mutual_difference(schools00, schools05, group = "race", unit = "school",
 #> 8:     structural -0.00349
 ```
 
+Show a segplot:
+
+``` r
+segplot(schools00, group = "race", unit = "school", weight = "n")
+```
+
+![](README-segplot-1.png)<!-- -->
+
 Find more information in the
-[vignette](https://elbersb.github.io/segregation/articles/segregation.html).
+[documentation](https://elbersb.github.io/segregation/).
 
 ## How to install
 
@@ -156,6 +184,9 @@ Across Time and Space. Sociological Methods & Research.
 -   Some of the analyses [in this
     article](https://multimedia.tijd.be/diversiteit/) by the Belgian
     newspaper *De Tijd* used the package.
+-   The analyses of [this article in the Wall Street
+    Journal](https://www.wsj.com/articles/chicago-vs-dallas-why-the-north-lags-behind-the-south-and-west-in-racial-integration-11657936680)
+    were produced using this package.
 
 ## References on entropy-based segregation indices
 
