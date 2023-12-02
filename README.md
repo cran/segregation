@@ -9,32 +9,34 @@ status](https://github.com/elbersb/segregation/workflows/R-CMD-check/badge.svg)]
 [![Coverage
 status](https://codecov.io/gh/elbersb/segregation/branch/master/graph/badge.svg)](https://app.codecov.io/github/elbersb/segregation?branch=master)
 
-An R package to calculate and decompose entropy-based, multigroup
-segregation indices, with a focus on the Mutual Information Index (M)
-and Theil’s Information Index (H). The index of Dissimilarity (D) is
-also supported.
+An R package to calculate, visualize, and decompose various segregation
+indices. The package currently supports
 
-Find more information in the
-[vignette](https://elbersb.github.io/segregation/articles/segregation.html)
-and the [documentation](https://elbersb.de/segregation).
+-   the Mutual Information Index (M),
+-   Theil’s Information Index (H),
+-   the index of Dissimilarity (D),
+-   the isolation and exposure index.
 
--   calculate total, between, within, and local segregation using the
-    M/H indices
--   decompose differences in total segregation over time (Elbers 2020)
--   other supported indices are the dissimilarity, isolation, and
-    exposure indices
--   supports [segregation
+Find more information in `vignette("segregation")` and the
+[documentation](https://elbersb.de/segregation).
+
+The package also supports
+
+-   [standard error and confidence intervals estimation via
+    bootstrapping](https://elbersb.com/public/posts/2021-11-24-segregation-bias/),
+    which also corrects for small sample bias
+-   decomposition of the M and H indices (within/between, local
+    segregation)
+-   decomposing differences in total segregation over time (Elbers 2020)
+-   [segregation
     visualizations](https://elbersb.github.io/segregation/articles/plotting.html)
     (segregation curves and ‘segplots’)
--   estimate standard errors and confidence intervals via bootstrapping,
-    which also corrects for small sample bias
--   contains functions to visualize segregation patterns
--   every method returns a
-    [tidy](https://vita.had.co.nz/papers/tidy-data.html)
-    [data.table](https://rdatatable.gitlab.io/data.table/) for easy
-    post-processing and plotting
--   uses the [`data.table`](https://rdatatable.gitlab.io/data.table/)
-    package internally, so it’s relatively fast
+
+Most methods return [tidy](https://vita.had.co.nz/papers/tidy-data.html)
+[data.tables](https://rdatatable.gitlab.io/data.table/) for easy
+post-processing and plotting. For speed, the package uses the
+[`data.table`](https://rdatatable.gitlab.io/data.table/) package
+internally, and implements some functions in C++.
 
 Most of the procedures implemented in this package are described in more
 detail [in this SMR
@@ -142,7 +144,7 @@ Show a segplot:
 segplot(schools00, group = "race", unit = "school", weight = "n")
 ```
 
-![](README-segplot-1.png)<!-- -->
+![](man/figures/README-segplot-1.png)<!-- -->
 
 Find more information in the
 [documentation](https://elbersb.github.io/segregation/).
@@ -163,11 +165,16 @@ devtools::install_github("elbersb/segregation")
 
 ## Citation
 
-If you use this package for your research, please cite:
+If you use this package for your research, please cite one of the
+following papers:
 
-Elbers, B. (2021). A Method for Studying Differences in Segregation
-Across Time and Space. Sociological Methods & Research.
-<https://doi.org/10.1177/0049124121986204>
+-   Elbers, Benjamin (2021). A Method for Studying Differences in
+    Segregation Across Time and Space. Sociological Methods & Research.
+    <https://doi.org/10.1177/0049124121986204>
+
+-   Elbers, Benjamin and Rob Gruijters (2023). Segplot: A New Method for
+    Visualizing Patterns of Multi-Group Segregation.
+    <https://doi.org/10.1016/j.rssm.2023.100860>
 
 ## Some additional resources
 
@@ -179,7 +186,7 @@ Across Time and Space. Sociological Methods & Research.
 -   A paper that makes use of this package: [Did Residential Racial
     Segregation in the U.S. Really Increase? An Analysis Accounting for
     Changes in Racial
-    Diversity](https://elbersb.com/public/posts/segregation-increase/)
+    Diversity](https://elbersb.com/public/posts/2021-07-23-segregation-increase/)
     ([Code and Data](https://osf.io/mg9q4/))
 -   Some of the analyses [in this
     article](https://multimedia.tijd.be/diversiteit/) by the Belgian

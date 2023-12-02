@@ -1,3 +1,14 @@
+# segregation (development version)
+
+# segregation 1.1.0
+
+- various improvements to compression algorithm
+- add dendrogram visualization
+- allow multiple curves in `segcurve` function
+- segplot: add optional 'secondary_plot' argument
+- segplot: remove 'title' argument
+- segplot: add optional 'hline' argument
+
 # segregation 1.0.0
 
 - add mutual_total_nested

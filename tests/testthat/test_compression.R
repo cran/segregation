@@ -124,3 +124,35 @@ test_that("scree plot", {
         expect_equal(nrow(plot$data), 3)
     }
 })
+
+test_that("data set names", {
+    subset <- schools00[1:50, ]
+    data.table::setDT(subset)
+    names(subset) <- c("state", "district", "unit", "group", "n")
+    res <- compress(subset, "group", "unit", neighbors = "all", weight = "n")
+
+    expect_equal(nrow(res$iterations), 16)
+})
+
+test_that("local neighbors", {
+    subset <- schools00[1:500, ]
+    data.table::setDT(subset)
+    res_local <- compress(subset, "race", "school", neighbors = "local", n_neighbors = 100, weight = "n")
+    res_local_small <- compress(subset, "race", "school", neighbors = "local", n_neighbors = 5, weight = "n")
+    res_all <- compress(subset, "race", "school", neighbors = "all", weight = "n")
+
+    expect_equal(res_local$iterations$old_unit, res_all$iterations$old_unit)
+    expect_true(
+        res_local_small$iterations[pct_M > 0.99][.N][["N_units"]] >
+            res_local$iterations[pct_M > 0.99][.N][["N_units"]]
+    )
+})
+
+test_that("dendrogram", {
+    dend <- as.dendrogram(res_all)
+    expect_equal(attr(dend, "height"), res_all$iterations$M[[1]])
+    expect_equal(attr(dend, "members"), length(unique(res_all$data$school)))
+
+    res_limited <- compress(subset, "race", "school", weight = "n", max_iter = 5)
+    expect_error(as.dendrogram(res_limited))
+})

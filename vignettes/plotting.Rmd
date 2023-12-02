@@ -1,8 +1,8 @@
 ---
-title: "Visualizing segregation"
+title: "Visualizing and compressing segregation"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Visualizing segregation}
+  %\VignetteIndexEntry{Visualizing and compressing segregation}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -32,16 +32,35 @@ detail [in this working paper](https://osf.io/preprints/socarxiv/ruw4g/).
 ## Segregation curve
 
 The segregation curve was first introduced by [Duncan and Duncan (1955)](https://www.jstor.org/stable/2088328).
-The function `segcurve()` provides a simple way of plotting a segregation curve:
+The function `segcurve()` provides a simple way of plotting one or several segregation curves:
 
 ```{r}
-segcurve(subset(schools00, race %in% c("white", "black")),
+segcurve(subset(schools00, race %in% c("white", "asian")),
   "race", "school",
-  weight = "n"
+  weight = "n",
+  segment = "state" # leave this out to produce a single curve
 )
 ```
 
+In this case, state `A` is the most segregated, while state `B` and `C` are similarly segregated,
+but at a lower level. Segregation curves are closely related to the index of dissimilarity, and 
+here this corresponds to the following index values:
+
+```{r}
+# converting to data.table makes this easier
+data.table::as.data.table(schools00)[
+  race %in% c("white", "asian"),
+  dissimilarity(.SD, "race", "school", weight = "n"),
+  by = .(state)
+]
+```
+
+
 ## Segplot
+
+::: {.alert .alert-primary}
+Please consider citing the following paper if you use segplot: Benjamin Elbers and Rob Gruijters. 2023. "[Segplot: A New Method for Visualizing Patterns of Multi-Group Segregation](https://doi.org/10.1016/j.rssm.2023.100860). Research in Social Stratification and Mobility.
+:::
 
 The function `segplot()` is provided to generate segplots. Segplots are described in more
 detail [in this working paper](https://osf.io/preprints/socarxiv/ruw4g/).
@@ -58,8 +77,6 @@ the reference distribution shown on the right of the segplot can be changed by
 supplying a two-column data frame to the `reference_distribution` argument. 
 One column of this frame should contain the group identifiers, and 
 the other should include the reference proportion of each group. 
-To show axis labels either on the left side only, the right side only, 
-or on both sides, use the argument `axis_labels`.
 
 Examples of how to use these arguments are given below:
 
@@ -67,7 +84,7 @@ Examples of how to use these arguments are given below:
 sch <- subset(schools00, state == "A")
 
 # basic segplot
-segplot(sch, "race", "school", weight = "n", axis_labels = "both")
+segplot(sch, "race", "school", weight = "n")
 
 # order by majority group (white in this case)
 segplot(sch, "race", "school", weight = "n", order = "majority")
@@ -85,7 +102,13 @@ segplot(sch, "race", "school",
 )
 ```
 
-### Compressing segregation information
+It is also possible to show a secondary plot that shows the adjusted local segregation scores:
+
+```{r}
+segplot(sch, "race", "school", weight = "n", secondary_plot = "segregation")
+```
+
+## Compressing segregation information
 
 The compression algorithm requires three steps to be taken. 
 First, it is important to decide which units should be permitted to merge: 
@@ -134,6 +157,13 @@ between the number of merges and the loss in segregation information:
 scree_plot(comp)
 ```
 
+Another way to learn more about the compression is to visualize the information as a dendrogram:
+
+```{r}
+dend <- as.dendrogram(comp)
+plot(dend, leaflab = "none")
+```
+
 The third step is to create a new dataset based on the desired level of compression. 
 This can be achieved using the function `merge_units()`, and either `n_units` or `percent`
 can be specified to indicate the desired level of compression.
@@ -148,5 +178,5 @@ The compressed dataset has the same format as the original dataset
 and can now be used to produce another segplot, e.g.
 
 ```{r}
-segplot(sch_compressed, "race", "school", weight = "n")
+segplot(sch_compressed, "race", "school", weight = "n", secondary_plot = "segregation")
 ```

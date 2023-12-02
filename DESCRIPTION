@@ -1,7 +1,7 @@
 Package: segregation
 Type: Package
 Title: Entropy-Based Segregation Indices
-Version: 1.0.0
+Version: 1.1.0
 Authors@R: person("Benjamin", "Elbers", email = "be2239@columbia.edu",
   role = c("aut", "cre"), comment = c(ORCID = "0000-0001-5392-3448"))
 Description: Computes segregation indices, including the Index of Dissimilarity,
@@ -22,15 +22,16 @@ Imports: data.table, checkmate, Rcpp, RcppProgress,
 Encoding: UTF-8
 LazyData: true
 Suggests: testthat, covr, knitr, rmarkdown, dplyr, ggplot2, scales,
-        tidycensus, tigris
+        tidycensus, tigris, rrapply, dendextend, patchwork
 URL: https://elbersb.github.io/segregation/
 BugReports: https://github.com/elbersb/segregation/issues
 RoxygenNote: 7.2.3
 VignetteBuilder: knitr
+SystemRequirements: C++17
 LinkingTo: Rcpp, RcppProgress
 NeedsCompilation: yes
-Packaged: 2023-08-24 20:20:56 UTC; benjamin
+Packaged: 2023-12-02 11:54:48 UTC; benjamin
 Author: Benjamin Elbers [aut, cre] (<https://orcid.org/0000-0001-5392-3448>)
 Maintainer: Benjamin Elbers <be2239@columbia.edu>
 Repository: CRAN
-Date/Publication: 2023-08-24 22:20:02 UTC
+Date/Publication: 2023-12-02 12:10:01 UTC

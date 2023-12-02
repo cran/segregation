@@ -27,74 +27,44 @@
 #' @export
 compress <- function(data, group, unit, weight = NULL,
                      neighbors = "local", n_neighbors = 50, max_iter = Inf) {
-    stopifnot(length(group) == 1)
-    stopifnot(length(unit) == 1)
+    checkmate::assert_data_frame(data)
+    checkmate::assert_vector(group, len = 1)
+    checkmate::assert_vector(unit, len = 1)
+    checkmate::assert_vector(weight, len = 1, null.ok = TRUE)
+    if (is.data.frame(neighbors)) {
+        checkmate::assert_data_frame(neighbors, ncols = 2)
+    } else {
+        checkmate::assert_choice(neighbors, c("all", "local"))
+    }
+    checkmate::assert_number(n_neighbors, lower = 1, finite = TRUE)
+    checkmate::assert_number(max_iter, finite = FALSE)
 
     d <- prepare_data(data, group, unit, weight)
 
-    if (is.factor(d[[unit]])) {
-        d[[unit]] <- droplevels(d[[unit]])
-    }
-    if (is.factor(d[[group]])) {
-        d[[group]] <- droplevels(d[[group]])
-    }
     if (!is.factor(d[[unit]]) && !is.character(d[[unit]])) {
         warning("coercing unit ids to character")
         d[[unit]] <- as.character(d[[unit]])
     }
 
+    wide <- dcast(d, paste0(unit, "~", group), value.var = "freq", fill = 0)
+    units <- as.character(wide[[unit]])
+    wide[, (unit) := NULL]
+
+    if (is.infinite(max_iter)) max_iter <- -1
+
     if (is.data.frame(neighbors)) {
-        stopifnot(ncol(neighbors) == 2)
+        mat <- cbind(as.character(neighbors[[1]]), as.character(neighbors[[2]]))
+        res <- compress_compute_cpp("df", mat, -1, as.matrix(wide), units, max_iter)
     } else if (neighbors == "all") {
-        all_units <- unique(d[[unit]])
-        neighbors <- expand.grid(a = all_units, b = all_units)
+        res <- compress_compute_cpp("all", matrix(""), -1, as.matrix(wide), units, max_iter)
     } else if (neighbors == "local") {
-        ls <- mutual_local(d, group, unit, weight = "freq", wide = TRUE)
-        entropy <- d[, .(entropy = entropy(.SD, group, weight = "freq")), by = unit]
-        ls <- merge(ls, entropy)
-
-        setorder(ls, entropy)
-        neighbors <- lapply(2:(nrow(ls) - 1), function(u) {
-            focal <- ls[[unit]][u]
-            nb_before <- ls[[unit]][max(c(1, u - n_neighbors)):(u - 1)]
-            nb_after <- ls[[unit]][(u + 1):min(c(nrow(ls), u + n_neighbors))]
-            data.table(a = focal, b = c(nb_before, nb_after))
-        })
-        neighbors <- rbindlist(neighbors)
-    } else {
-        stop("neighbors: not a valid argument")
+        res <- compress_compute_cpp("local", matrix(""), n_neighbors, as.matrix(wide), units, max_iter)
     }
 
-    # rename -- easier
-    setnames(d, unit, "unit")
-    setnames(d, group, "group")
-    setkeyv(d, "unit")
-
-    # sort within rows to get rid of duplicates (i.e. 1-2 eq. 2-1)
-    neighbors <- data.table::as.data.table(t(apply(neighbors, 1, sort)))
-    neighbors <- unique(neighbors)[V1 != V2]
-
-    # calculate M
-    initial_M <- mutual_total(d, "group", "unit", weight = "freq")[["est"]][1]
-
-    if (is.infinite(max_iter)) {
-        total_units <- length(d[, unique(unit)])
-        max_iter <- min(nrow(neighbors), total_units - 1)
-    }
-
-    m_neighbors <- as.matrix(neighbors)
-    wide <- dcast(d, unit ~ group, value.var = "freq", fill = 0)
-    m_data <- as.matrix(wide[, -"unit"])
-
-    res <- compress_compute_cpp(m_neighbors, m_data, as.character(wide[, unit]), max_iter)
     iterations <- as.data.table(res)
-    if (nrow(iterations) == 0) {
-        stop("user interruption")
-    }
-    iterations[, pct_M := M / initial_M]
 
-    setnames(d, "unit", unit)
-    setnames(d, "group", group)
+    initial_M <- mutual_total(d, group, unit, weight = "freq")[["est"]][1]
+    iterations[, pct_M := M / initial_M]
     setnames(d, "freq", "n")
 
     compression <- list(
@@ -177,7 +147,7 @@ scree_plot <- function(compression, tail = Inf) {
         ggplot2::theme(legend.position = "none", panel.grid.minor = ggplot2::element_blank())
 }
 
-#' merge_units
+#' Creates a compressed dataset
 #'
 #' After running \link{compress}, this function creates a dataset where
 #' units are merged.
@@ -243,40 +213,8 @@ get_crosswalk <- function(compression, n_units = NULL, percent = NULL, parts = F
     }
 
     iterations <- compression$iterations[1:n_iterations, .(N_units, old_unit, new_unit)]
-    n <- iterations[, utils::tail(N_units, 1)]
-    iterations[, N_units := NULL]
 
-    bags <- list(c(iterations[1, old_unit], iterations[1, new_unit]))
-
-    if (nrow(iterations) <= 1) {
-        seq <- c()
-    } else {
-        seq <- 2:nrow(iterations)
-    }
-
-    for (i in seq) {
-        old_unit <- iterations[i, old_unit]
-        new_unit <- iterations[i, new_unit]
-
-        old_unit_bag <- sapply(seq_len(length(bags)), function(ibag) old_unit %in% bags[[ibag]])
-        new_unit_bag <- sapply(seq_len(length(bags)), function(ibag) new_unit %in% bags[[ibag]])
-
-        if ((sum(old_unit_bag) + sum(new_unit_bag)) == 0) {
-            bags[[length(bags) + 1]] <- c(old_unit, new_unit)
-        } else if (sum(old_unit_bag) == 1 && sum(new_unit_bag) == 0) {
-            bags[[which(old_unit_bag)]] <- c(bags[[which(old_unit_bag)]], new_unit)
-        } else if (sum(old_unit_bag) == 0 && sum(new_unit_bag) == 1) {
-            bags[[which(new_unit_bag)]] <- c(bags[[which(new_unit_bag)]], old_unit)
-        } else if (sum(old_unit_bag) == 1 && sum(new_unit_bag) == 1) {
-            bags[[length(bags) + 1]] <- c(
-                bags[[which(new_unit_bag)]],
-                bags[[which(old_unit_bag)]]
-            )
-            bags[[which(new_unit_bag)]] <- "X"
-            bags[[which(old_unit_bag)]] <- "X"
-            bags <- bags[bags != "X"]
-        }
-    }
+    bags <- get_crosswalk_cpp(iterations[, old_unit], iterations[, new_unit])
 
     merged <- data.table(
         unit = unlist(bags),
@@ -296,4 +234,150 @@ get_crosswalk <- function(compression, n_units = NULL, percent = NULL, parts = F
     combined <- rbindlist(list(merged, unmerged), fill = TRUE)
     setnames(combined, "unit", compression$unit)
     combined
+}
+
+#' @importFrom stats as.dendrogram
+#' @export
+as.dendrogram.segcompression <- function(object, ...) {
+    if (utils::tail(object$iterations$N_units, 1) != 1) {
+        stop("Compression algorithm needs to be run on complete dataset (max_iter = Inf)")
+    }
+    if (!requireNamespace("rrapply", quietly = TRUE)) {
+        stop("Please install rrapply to use this function")
+    }
+    if (!requireNamespace("dendextend", quietly = TRUE)) {
+        stop("Please install dendextend to use this function")
+    }
+
+    reduction <- 0
+    tree <- list()
+
+    for (i in seq_len(nrow(object$iterations))) {
+        old_unit <- object$iterations[i, ][["old_unit"]]
+        new_unit <- object$iterations[i, ][["new_unit"]]
+        M_wgt <- object$iterations[i, ][["M_wgt"]]
+        reduction <- reduction + M_wgt
+
+        if (length(tree) > 0) {
+            find_old <- rrapply::rrapply(tree,
+                classes = "list",
+                condition = function(x, .xname) x == old_unit,
+                f = function(x, .xpos) .xpos,
+                how = "flatten"
+            )
+            find_new <- rrapply::rrapply(tree,
+                classes = "list",
+                condition = function(x, .xname) x == new_unit,
+                f = function(x, .xpos) .xpos,
+                how = "flatten"
+            )
+        } else {
+            find_old <- list()
+            find_new <- list()
+        }
+
+        if (length(find_old) > 0 && length(find_new) > 0) {
+            indices <- sort(c(find_old[[1]][1], find_new[[1]][1]))
+            combined <- list(tree[[indices[1]]], tree[[indices[2]]])
+            attr(combined, "height") <- reduction
+
+            tree[[indices[1]]] <- combined
+            tree[[indices[2]]] <- NULL
+        } else if (length(find_old) > 0 || length(find_new) > 0) {
+            if (length(find_old) > 0) {
+                index <- find_old[[1]][1]
+                new_item <- list(new_unit)
+                attr(new_item, "label") <- new_unit
+            } else {
+                index <- find_new[[1]][1]
+                new_item <- list(old_unit)
+                attr(new_item, "label") <- old_unit
+            }
+            attr(new_item, "height") <- 0
+            attr(new_item, "members") <- 1
+            attr(new_item, "leaf") <- TRUE
+
+            if (M_wgt == attr(tree[[index]], "height")) {
+                tree[[index]][[length(tree[[index]]) + 1]] <- new_item
+            } else {
+                combined <- list(tree[[index]], new_item)
+                attr(combined, "height") <- reduction
+                tree[[index]] <- combined
+            }
+        } else {
+            lhs <- list(old_unit)
+            attr(lhs, "label") <- old_unit
+            attr(lhs, "height") <- 0
+            attr(lhs, "members") <- 1
+            attr(lhs, "leaf") <- TRUE
+            rhs <- list(new_unit)
+            attr(rhs, "label") <- new_unit
+            attr(rhs, "height") <- 0
+            attr(rhs, "members") <- 1
+            attr(rhs, "leaf") <- TRUE
+            combined <- list(lhs, rhs)
+            attr(combined, "height") <- M_wgt
+            attr(combined, "members") <- 2
+            tree[[length(tree) + 1]] <- combined
+        }
+    }
+
+    dend <- tree[[1]]
+    class(dend) <- "dendrogram"
+    dend <- dendextend::fix_members_attr.dendrogram(dend)
+    dend <- midcache.dendrogram(dend)
+    return(dend)
+}
+
+# copied from stats -- not exported
+midcache.dendrogram <- function(x) {
+    stopifnot(inherits(x, "dendrogram"))
+    setmid <- function(d, type) {
+        depth <- 0L
+        kk <- integer()
+        jj <- integer()
+        dd <- list()
+        repeat {
+            if (!stats::is.leaf(d)) {
+                k <- length(d)
+                depth <- depth + 1L
+                kk[depth] <- k
+                dd[[depth]] <- d
+                d <- d[[jj[depth] <- 1L]]
+                next
+            }
+            while (depth) {
+                k <- kk[depth]
+                j <- jj[depth]
+                r <- dd[[depth]]
+                r[[j]] <- unclass(d)
+                if (j < k) {
+                    break
+                }
+                depth <- depth - 1L
+                midS <- sum(vapply(r, .midDend, 0))
+                attr(r, "midpoint") <- (.memberDend(r[[1L]]) + midS) / 2
+                d <- r
+            }
+            if (!depth) {
+                break
+            }
+            dd[[depth]] <- r
+            d <- r[[jj[depth] <- j + 1L]]
+        }
+        d
+    }
+    setmid(x)
+}
+
+.midDend <- function(x) {
+    attr(x, "midpoint") %||% 0
+}
+
+.memberDend <- function(x) {
+    attr(x, "x.member") %||% (attr(x, "members") %||% 1L)
+}
+
+`%||%` <- function(L, R) {
+    if (is.null(L)) R else L
 }

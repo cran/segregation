@@ -83,7 +83,7 @@ mutual_total_within_compute <- function(data, group, unit, within, base,
     )
 }
 
-#' Calculate total segregation for M and H
+#' Calculates the Mutual Information Index M and Theil's Entropy Index H
 #'
 #' Returns the total segregation between \code{group} and \code{unit}.
 #' If \code{within} is given, calculates segregation within each
@@ -207,7 +207,7 @@ mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
     ret
 }
 
-#' Calculate detailed within-category segregation scores for M and H
+#' Calculates detailed within-category segregation scores for M and H
 #'
 #' Calculates the segregation between \code{group} and \code{unit}
 #' within each category defined by \code{within}.
@@ -258,6 +258,7 @@ mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
 #' Ricardo Mora and Javier Ruiz-Castillo. 2011.
 #'      "Entropy-based Segregation Indices". Sociological Methodology 41(1): 159–194.
 #' @examples
+#' \dontrun{
 #' (within <- mutual_within(schools00, "race", "school",
 #'     within = "state",
 #'     weight = "n", wide = TRUE
@@ -273,6 +274,7 @@ mutual_total <- function(data, group, unit, within = NULL, weight = NULL,
 #' sum(within$p * within$ent_ratio * within$H) # => .321
 #' # compare with:
 #' mutual_total(schools00, "race", "school", within = "state", weight = "n")
+#' }
 #' @import data.table
 #' @export
 mutual_within <- function(data, group, unit, within,
@@ -353,7 +355,7 @@ mutual_local_compute <- function(data, group, unit, base = exp(1)) {
     )
 }
 
-#' Calculates local segregation indices based on M
+#' Calculates local segregation scores based on M
 #'
 #' Returns local segregation indices for each category defined
 #' by \code{unit}.
@@ -472,7 +474,7 @@ mutual_local <- function(data, group, unit, weight = NULL,
 }
 
 
-#' Calculate a nested decomposition of segregation for M and H
+#' Calculates a nested decomposition of segregation for M and H
 #'
 #' Returns the between-within decomposition defined by
 #' the sequence of variables in \code{unit}.
